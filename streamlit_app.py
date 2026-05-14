@@ -1,7 +1,6 @@
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import yfinance as yf
-import pandas_ta as ta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
@@ -153,14 +152,29 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
 
     if not df_all.empty and 'Close' in df_all.columns:
         df = df_all.copy()
-        df['EMA7'] = ta.ema(df['Close'], length=7)
-        df['EMA21'] = ta.ema(df['Close'], length=21)
-        df['EMA50'] = ta.ema(df['Close'], length=50)
-        df['EMA100'] = ta.ema(df['Close'], length=100)
-        df['EMA200'] = ta.ema(df['Close'], length=200)
-        df['RSI'] = ta.rsi(df['Close'], length=14)
-        macd = ta.macd(df['Close'])
-        df = pd.concat([df, macd], axis=1)
+        
+        # NATIVE EMA HESAPLAMALARI
+        df['EMA7'] = df['Close'].ewm(span=7, adjust=False).mean()
+        df['EMA21'] = df['Close'].ewm(span=21, adjust=False).mean()
+        df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
+        df['EMA100'] = df['Close'].ewm(span=100, adjust=False).mean()
+        df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
+        
+        # NATIVE RSI HESAPLAMASI
+        delta = df['Close'].diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        avg_gain = gain.ewm(com=13, adjust=False).mean()
+        avg_loss = loss.ewm(com=13, adjust=False).mean()
+        rs = avg_gain / avg_loss
+        df['RSI'] = 100 - (100 / (1 + rs))
+        
+        # NATIVE MACD HESAPLAMASI
+        ema12 = df['Close'].ewm(span=12, adjust=False).mean()
+        ema26 = df['Close'].ewm(span=26, adjust=False).mean()
+        df['MACD_12_26_9'] = ema12 - ema26
+        df['MACDs_12_26_9'] = df['MACD_12_26_9'].ewm(span=9, adjust=False).mean()
+        df['MACDh_12_26_9'] = df['MACD_12_26_9'] - df['MACDs_12_26_9']
         
         if view_period == "1 Ay": df_plot = df.tail(30 if secilen_int == "1 Gün" else 150).copy()
         elif view_period == "3 Ay": df_plot = df.tail(90 if secilen_int == "1 Gün" else 400).copy()
@@ -241,10 +255,9 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['EMA50'], name="EMA 50 (Orta Vade)", line=dict(color='#FF9800', width=1.5, dash='dash')), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['EMA100'], name="EMA 100 (Ana Yön)", line=dict(color='#9C27B0', width=2, dash='dot')), row=1, col=1)
         
-        macd_col = [c for c in df.columns if 'MACDh' in c]
-        if macd_col:
-            colors = ['#00C853' if val >= 0 else '#D50000' for val in df_plot[macd_col[0]]]
-            fig.add_trace(go.Bar(x=df_plot.index, y=df_plot[macd_col[0]], name="MACD", marker_color=colors), row=2, col=1)
+        if 'MACDh_12_26_9' in df_plot.columns:
+            colors = ['#00C853' if val >= 0 else '#D50000' for val in df_plot['MACDh_12_26_9']]
+            fig.add_trace(go.Bar(x=df_plot.index, y=df_plot['MACDh_12_26_9'], name="MACD", marker_color=colors), row=2, col=1)
         
         fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], showspikes=True, spikemode="across", spikedash="dot", fixedrange=False)
         fig.update_yaxes(showspikes=True, spikemode="across", spikedash="dot", fixedrange=False)
@@ -292,7 +305,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                 else: st.warning(f"⚠️ **PAHALI:** Hissenin F/K'sı ({fk_val:.2f}), {sektor_adi} sektör ortalamasının ({oto_sektor_fk}) üzerinde.")
         
         # =========================================================================
-        # OTONOM RAPOR METNİ VE PUANLAMA MOTORU (DÜZELTİLDİ VE GERİ EKLENDİ)
+        # OTONOM RAPOR METNİ VE PUANLAMA MOTORU (KUSURSUZ AKTİF)
         # =========================================================================
         ai_puan = 0.0
         ai_rapor_maddeleri = []
@@ -400,9 +413,18 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             if data.empty: return pd.DataFrame()
             if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
             data.columns = [str(c).strip().capitalize() for c in data.columns]
-            data['EMA21'] = ta.ema(data['Close'], length=21)
-            data['EMA50'] = ta.ema(data['Close'], length=50)
-            data['RSI'] = ta.rsi(data['Close'], length=14)
+            
+            # Native Endeks İndikatör Hesaplamaları
+            data['EMA21'] = data['Close'].ewm(span=21, adjust=False).mean()
+            data['EMA50'] = data['Close'].ewm(span=50, adjust=False).mean()
+            
+            idx_delta = data['Close'].diff()
+            idx_gain = idx_delta.clip(lower=0)
+            idx_loss = -idx_delta.clip(upper=0)
+            idx_avg_gain = idx_gain.ewm(com=13, adjust=False).mean()
+            idx_avg_loss = idx_loss.ewm(com=13, adjust=False).mean()
+            idx_rs = idx_avg_gain / idx_avg_loss
+            data['RSI'] = 100 - (100 / (1 + idx_rs))
             return data
 
         def endeks_yorumla(df_idx):
@@ -530,8 +552,20 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
                 if hist.empty: continue
                 skor = 0
                 son_fiyat = hist['Close'].iloc[-1].item()
-                ema21 = ta.ema(hist['Close'], length=21).iloc[-1].item()
-                rsi = ta.rsi(hist['Close'], length=14).iloc[-1].item()
+                
+                # Native Radar Göstergeleri
+                ema21_series = hist['Close'].ewm(span=21, adjust=False).mean()
+                ema21 = ema21_series.iloc[-1].item()
+                
+                r_delta = hist['Close'].diff()
+                r_gain = r_delta.clip(lower=0)
+                r_loss = -r_delta.clip(upper=0)
+                r_avg_gain = r_gain.ewm(com=13, adjust=False).mean()
+                r_avg_loss = r_loss.ewm(com=13, adjust=False).mean()
+                r_rs = r_avg_gain / r_avg_loss
+                rsi_series = 100 - (100 / (1 + r_rs))
+                rsi = rsi_series.iloc[-1].item()
+                
                 if son_fiyat > ema21: skor += 1
                 if 30 < rsi < 65: skor += 1
                 fk = inf.get('trailingPE', 100)
@@ -587,11 +621,24 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
         df_fx['box_alt'] = df_fx['Low'].rolling(window=20).min()
         df_fx['box_orta'] = (df_fx['box_ust'] + df_fx['box_alt']) / 2
         
-        # 2. ATR & Teknik İndikatörler
-        df_fx['ATR'] = ta.atr(df_fx['High'], df_fx['Low'], df_fx['Close'], length=14)
-        df_fx['RSI'] = ta.rsi(df_fx['Close'], length=14)
-        df_fx['EMA21'] = ta.ema(df_fx['Close'], length=21)
-        df_fx['EMA50'] = ta.ema(df_fx['Close'], length=50)
+        # 2. Native ATR & Teknik İndikatör Hesaplamaları
+        high_low = df_fx['High'] - df_fx['Low']
+        high_close = (df_fx['High'] - df_fx['Close'].shift()).abs()
+        low_close = (df_fx['Low'] - df_fx['Close'].shift()).abs()
+        ranges = pd.concat([high_low, high_close, low_close], axis=1)
+        true_range = ranges.max(axis=1)
+        df_fx['ATR'] = true_range.ewm(alpha=1/14, adjust=False).mean()
+        
+        fx_delta = df_fx['Close'].diff()
+        fx_gain = fx_delta.clip(lower=0)
+        fx_loss = -fx_delta.clip(upper=0)
+        fx_avg_gain = fx_gain.ewm(com=13, adjust=False).mean()
+        fx_avg_loss = fx_loss.ewm(com=13, adjust=False).mean()
+        fx_rs = fx_avg_gain / fx_avg_loss
+        df_fx['RSI'] = 100 - (100 / (1 + fx_rs))
+        
+        df_fx['EMA21'] = df_fx['Close'].ewm(span=21, adjust=False).mean()
+        df_fx['EMA50'] = df_fx['Close'].ewm(span=50, adjust=False).mean()
         
         son_fiyat = float(df_fx['Close'].iloc[-1])
         atr_val = float(df_fx['ATR'].iloc[-1])
