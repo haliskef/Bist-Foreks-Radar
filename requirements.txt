@@ -1,4 +1,5 @@
 streamlit-autorefresh
 yfinance
 plotly
+pandas
 pandas_ta
