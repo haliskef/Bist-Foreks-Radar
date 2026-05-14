@@ -1,6 +1,7 @@
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 import yfinance as yf
+import pandas_ta as ta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
@@ -43,13 +44,6 @@ st.markdown("""
     }
     .ai-score-box h2 { color: #FFD700 !important; border: none !important; margin-bottom: 5px; }
     .ai-score-box h1 { color: #FFFFFF !important; font-size: 3rem !important; margin-top: 0; border: none !important; margin-bottom: 5px; }
-    
-    .ai-comment-box {
-        background-color: #FFFFFF !important; padding: 18px; border-radius: 12px;
-        border-left: 5px solid #1A1A1A; border-top: 1px solid #E0E0E0;
-        border-right: 1px solid #E0E0E0; border-bottom: 1px solid #E0E0E0;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-top: 15px; margin-bottom: 15px;
-    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -82,7 +76,7 @@ forex_assets = {
 }
 
 # =================================================================================
-# ÇEKİRDEK 1: LAZER MODU (DETAYLI ANALİZ & STRATEJİ)
+# ÇEKİRDEK 1: LAZER MODU
 # =================================================================================
 if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
     st_autorefresh(interval=30000, limit=500, key="bist_guncelleme")
@@ -159,27 +153,14 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
 
     if not df_all.empty and 'Close' in df_all.columns:
         df = df_all.copy()
-        
-        # OTONOM TEKNİK HESAPLAMALAR (SAF PANDAS)
-        df['EMA7'] = df['Close'].ewm(span=7, adjust=False).mean()
-        df['EMA21'] = df['Close'].ewm(span=21, adjust=False).mean()
-        df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
-        df['EMA100'] = df['Close'].ewm(span=100, adjust=False).mean()
-        df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
-        
-        # SAF PANDAS RSI HESAPLAMA
-        delta = df['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / (loss + 1e-9)
-        df['RSI'] = 100 - (100 / (1 + rs))
-        
-        # SAF PANDAS MACD HESAPLAMA
-        exp1 = df['Close'].ewm(span=12, adjust=False).mean()
-        exp2 = df['Close'].ewm(span=26, adjust=False).mean()
-        df['MACD_12_26_9'] = exp1 - exp2
-        df['MACDs_12_26_9'] = df['MACD_12_26_9'].ewm(span=9, adjust=False).mean()
-        df['MACDh_12_26_9'] = df['MACD_12_26_9'] - df['MACDs_12_26_9']
+        df['EMA7'] = ta.ema(df['Close'], length=7)
+        df['EMA21'] = ta.ema(df['Close'], length=21)
+        df['EMA50'] = ta.ema(df['Close'], length=50)
+        df['EMA100'] = ta.ema(df['Close'], length=100)
+        df['EMA200'] = ta.ema(df['Close'], length=200)
+        df['RSI'] = ta.rsi(df['Close'], length=14)
+        macd = ta.macd(df['Close'])
+        df = pd.concat([df, macd], axis=1)
         
         if view_period == "1 Ay": df_plot = df.tail(30 if secilen_int == "1 Gün" else 150).copy()
         elif view_period == "3 Ay": df_plot = df.tail(90 if secilen_int == "1 Gün" else 400).copy()
@@ -260,9 +241,10 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['EMA50'], name="EMA 50 (Orta Vade)", line=dict(color='#FF9800', width=1.5, dash='dash')), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['EMA100'], name="EMA 100 (Ana Yön)", line=dict(color='#9C27B0', width=2, dash='dot')), row=1, col=1)
         
-        if 'MACDh_12_26_9' in df_plot.columns:
-            colors = ['#00C853' if val >= 0 else '#D50000' for val in df_plot['MACDh_12_26_9']]
-            fig.add_trace(go.Bar(x=df_plot.index, y=df_plot['MACDh_12_26_9'], name="MACD", marker_color=colors), row=2, col=1)
+        macd_col = [c for c in df.columns if 'MACDh' in c]
+        if macd_col:
+            colors = ['#00C853' if val >= 0 else '#D50000' for val in df_plot[macd_col[0]]]
+            fig.add_trace(go.Bar(x=df_plot.index, y=df_plot[macd_col[0]], name="MACD", marker_color=colors), row=2, col=1)
         
         fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], showspikes=True, spikemode="across", spikedash="dot", fixedrange=False)
         fig.update_yaxes(showspikes=True, spikemode="across", spikedash="dot", fixedrange=False)
@@ -304,65 +286,70 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             else: k5.error(f"**ROE:** {roe_str} (Düşük)")
         else: k5.metric("ROE", "N/A")
 
-        # SEKTÖREL KIYASLAMA METNİ VE GEÇİCİ DEĞİŞKEN
-        sektor_durum_metni = ""
         if oto_sektor_fk:
             if isinstance(fk_val, float):
-                if fk_val < oto_sektor_fk:
-                    st.success(f"✅ **UCUZ:** Hissenin F/K'sı ({fk_val:.2f}), {sektor_adi} sektör ortalamasının ({oto_sektor_fk}) altında.")
-                    sektor_durum_metni = "Hisse, sektörel bazda çarpan olarak ucuz fiyatlanıyor."
-                else:
-                    st.warning(f"⚠️ **PAHALI:** Hissenin F/K'sı ({fk_val:.2f}), {sektor_adi} sektör ortalamasının ({oto_sektor_fk}) üzerinde.")
-                    sektor_durum_metni = "Hisse, sektörel rakiplerine göre primli/pahalı işlem görüyor."
+                if fk_val < oto_sektor_fk: st.success(f"✅ **UCUZ:** Hissenin F/K'sı ({fk_val:.2f}), {sektor_adi} sektör ortalamasının ({oto_sektor_fk}) altında.")
+                else: st.warning(f"⚠️ **PAHALI:** Hissenin F/K'sı ({fk_val:.2f}), {sektor_adi} sektör ortalamasının ({oto_sektor_fk}) üzerinde.")
         
-        # ---------------------------------------------------------------------------------
-        # YAPAY ZEKA HİBRİT KARAR MOTORU SKORLAMA VE YAZILIMSAL GEREKÇELENDİRME PANELİ
-        # ---------------------------------------------------------------------------------
+        # =========================================================================
+        # OTONOM RAPOR METNİ VE PUANLAMA MOTORU (DÜZELTİLDİ VE GERİ EKLENDİ)
+        # =========================================================================
         ai_puan = 0.0
-        gerekceler = []
-        
+        ai_rapor_maddeleri = []
+
+        # Temel Analiz Kriterleri ve Yorum Gerekçeleri
         if isinstance(fk_val, float) and fk_val > 0:
             if oto_sektor_fk and fk_val < oto_sektor_fk: 
                 ai_puan += 1.5
-                gerekceler.append("🟩 Temel Analiz: F/K oranı sektörel ortalamanın altında (+1.5 Puan)")
+                ai_rapor_maddeleri.append(f"📊 **F/K Oranı Olumlu:** Hisse F/K'sı ({fk_val:.2f}), rakip {sektor_adi} sektör ortalamasından ({oto_sektor_fk}) daha iskontolu.")
             elif fk_val < 15: 
                 ai_puan += 1.0
-                gerekceler.append("🟩 Temel Analiz: F/K çarpanı makul sınır olan 15'in altında (+1.0 Puan)")
+                ai_rapor_maddeleri.append(f"📊 **F/K Oranı Makul:** Sektör verisi eksik fakat {fk_val:.2f} genel piyasa çarpanlarına göre makul.")
+            else:
+                ai_rapor_maddeleri.append(f"🔺 **F/K Oranı Yüksek:** Hisse çarpanı ({fk_val:.2f}) yüksek, kârlılığa oranla pahalı fiyatlanıyor olabilir.")
         
-        if isinstance(pddd_val, float) and 0 < pddd_val < 3.5: 
-            ai_puan += 1.0
-            gerekceler.append("🟩 Temel Analiz: PD/DD oranı defter değerine yakın ve güvenli bölgede (+1.0 Puan)")
-            
+        if isinstance(pddd_val, float):
+            if 0 < pddd_val < 3.5: 
+                ai_puan += 1.0
+                ai_rapor_maddeleri.append(f"📑 **Defter Değeri Dengeli:** PD/DD oranı {pddd_val:.2f} ile özsermayeye göre güvenli bölgede.")
+            else:
+                ai_rapor_maddeleri.append(f"🔺 **Yüksek PD/DD:** Özsermayesinin {pddd_val:.2f} katından işlem görüyor, primli yapı hakim.")
+
         if roe_val:
             if roe_val > 0.30: 
                 ai_puan += 1.5
-                gerekceler.append("🟩 Mali Yapı: Özsermaye Kârlılığı (ROE) %30 üstünde, mükemmel büyüme gücü (+1.5 Puan)")
+                ai_rapor_maddeleri.append(f"💰 **Mükemmel Özsermaye Kârlılığı (ROE):** %{roe_val*100:.2f} kârlılık ile şirket parasını çok verimli büyütüyor.")
             elif roe_val > 0.15: 
                 ai_puan += 1.0
-                gerekceler.append("🟩 Mali Yapı: Özsermaye Kârlılığı (ROE) %15 üstünde, istikrarlı getiri (+1.0 Puan)")
-                
+                ai_rapor_maddeleri.append(f"💰 **Yeterli Kârlılık (ROE):** %{roe_val*100:.2f} kârlılık rasyosu enflasyon/faiz dengesinde makul.")
+        
         if favok_marji and favok_marji > 0.15: 
             ai_puan += 1.0
-            gerekceler.append("🟩 Operasyonel Güç: FAVÖK Marjı %15'in üzerinde, ana faaliyet kârlılığı güçlü (+1.0 Puan)")
+            ai_rapor_maddeleri.append(f"🏭 **Güçlü Operasyonel Kâr:** FAVÖK marjı %{favok_marji*100:.2f} ile ana faaliyet alanında güçlü nakit üretiyor.")
 
+        # Teknik Analiz Momentum ve Trend Yorum Gerekçeleri
         if 30 <= rsi_val <= 45: 
             ai_puan += 2.0  
-            gerekceler.append("🟩 Teknik İndikatör: RSI toplama/akümülasyon bölgesinde (30-45), risk düşük (+2.0 Puan)")
+            ai_rapor_maddeleri.append(f"🎯 **RSI Toplama Bölgesinde:** RSI {rsi_val:.2f} seviyesinde; aşırı alımdan uzak, dönüş için ideal güç toplama alanında.")
         elif 45 < rsi_val <= 60: 
             ai_puan += 1.0 
-            gerekceler.append("🟩 Teknik İndikatör: RSI nötr/pozitif momentum bölgesinde, dengeli seyir (+1.0 Puan)")
+            ai_rapor_maddeleri.append(f"📊 **RSI Dengeli:** RSI {rsi_val:.2f} ile nötr bölgede, trend yön arayışında.")
         elif rsi_val < 30: 
             ai_puan += 1.5       
-            gerekceler.append("⚠️ Teknik İndikatör: RSI aşırı satım bölgesinde (<30), tepki yükselişi gelebilir (+1.5 Puan)")
-        
+            ai_rapor_maddeleri.append(f"🔥 **Aşırı Satım Bölgesi:** RSI {rsi_val:.2f} ile aşırı düştü, buralardan teknik tepki alımları gelebilir.")
+        else:
+            ai_rapor_maddeleri.append(f"⚠️ **RSI Şişkinlik Sinyali:** RSI {rsi_val:.2f} ile aşırı alım bölgesine yakın, kâr satışları tetiklenebilir.")
+
         if son_fiyat > df['EMA50'].iloc[-1]: 
             ai_puan += 1.0 
-            gerekceler.append("🟩 Trend Analizi: Fiyat orta vadeli dinamik destek olan EMA 50 üzerinde (+1.0 Puan)")
+            ai_rapor_maddeleri.append("📈 **EMA Trend Gücü Üstün:** Fiyat 50 günlük hareketli ortalamanın üzerinde kalarak orta vadeli yükselişi koruyor.")
+        else:
+            ai_rapor_maddeleri.append("📉 **EMA Trend Baskısı:** Orta vadeli EMA50 ortalamasının altında, satış baskısı sürüyor.")
             
         if slope > 0: 
             ai_puan += 1.0 
-            gerekceler.append("🟩 Regresyon: Doğrusal trend yönü pozitif/yukarı yönlü (+1.0 Puan)")
-        
+            ai_rapor_maddeleri.append("📐 **Kanal Eğimi Pozitif:** Lineer regresyon kanal yönü yukarı eğimli, ana yön pozitif.")
+
         fibo_618 = fib_seviyeleri['61.8%']
         ema_100 = df['EMA100'].iloc[-1]
         fibo_fark = abs((son_fiyat - fibo_618) / fibo_618) if fibo_618 != 0 else 1
@@ -370,11 +357,12 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         
         if fibo_fark <= 0.05 or ema100_fark <= 0.05: 
             ai_puan += 1.0 
-            gerekceler.append("🎯 Stratejik Konum: Fiyat kritik Fibonacci %61.8 veya EMA 100 ana desteğine çok yakın (+1.0 Puan)")
+            ai_rapor_maddeleri.append("🛡️ **Kritik Kaya Destek Yakınlığı:** Fiyat, güçlü Fibonacci %61.8 veya EMA 100 kalesine çok yakın; risk/ödül oranı yüksek.")
 
         ai_puan = min(10.0, max(0.0, round(ai_puan, 1))) 
         doluluk_yuzdesi = int((ai_puan / 10.0) * 100)
         
+        # Yapay Zeka Görsel Rapor Kutusu
         st.markdown("<div class='ai-score-box'>", unsafe_allow_html=True)
         st.markdown(f"<h2>🤖 YAPAY ZEKA HİBRİT KARAR MOTORU (ÖZET RAPOR)</h2>", unsafe_allow_html=True)
         st.markdown(f"<h1>{ai_puan} <span style='font-size: 1.5rem; color: #AAAAAA;'>/ 10</span></h1>", unsafe_allow_html=True)
@@ -386,32 +374,23 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         """, unsafe_allow_html=True)
         
         if rsi_val > 75 or son_fiyat >= son_ust:
-            st.error("🚨 **SİSTEM UYARISI: KÂR ALMA / SATIŞ BÖLGESİ!**")
-            emir_notu = "Aşırı alım ve trend kanalı tavan bölgesine ulaşıldı. Mevcut pozisyonlarda kar realizasyonu veya sıkı stop takibi önerilir. Yeni alım için risklidir."
+            st.error("🚨 **SİSTEM UYARISI: KÂR ALMA / SATIŞ BÖLGESİ! Fiyat doygunluğa ulaştı.**")
         elif ai_puan >= 7.5:
-            st.success("🟢 **KUSURSUZ FIRSAT (GÜÇLÜ ALIM):**")
-            emir_notu = "Hem mali rasyolar hem de stratejik teknik destekler mükemmel bir örtüşme sinyali veriyor. Güçlü alım ve orta vadeli yatırım pozisyonu için ideal bölge."
+            st.success("🟢 **KUSURSUZ FIRSAT (GÜÇLÜ ALIM): Temel rasyolar ucuz ve teknik destekler sağlam konumda.**")
         elif ai_puan >= 5.0:
-            st.warning("🟡 **POTANSİYEL (İZLEME VE KADEMELİ ALIM):**")
-            emir_notu = "Sistem belirli riskler barındırmakla birlikte genel görünümü olumlu değerlendiriyor. Destek seviyelerine doğru çekilmelerde kademeli alım stratejisi uygulanabilir."
+            st.warning("🟡 **POTANSİYEL (İZLEME VE KADEMELİ ALIM): Belirli kriterler olumlu fakat teyit beklenmeli.**")
         else:
-            st.error("🔴 **RİSKLİ BÖLGE (UZAK DUR):**")
-            emir_notu = "Zayıf kârlılık, yüksek çarpanlar ve negatif trend baskısı mevcut. Teknik kırılım netleşene ve mali rasyolar düzelene kadar izlemede kalınmalıdır."
+            st.error("🔴 **RİSKLİ BÖLGE (UZAK DUR): Çarpanlar pahalı veya teknik göstergeler aşağı yönlü kırılım aşamasında.**")
+            
+        # Dinamik Rapor Maddelerinin Ekrana Basılması
+        st.markdown("#### 🔍 SİSTEM GEREKÇELERİ VE SINYAL DETAYLARI:")
+        for madde in ai_rapor_maddeleri:
+            st.markdown(f"<span style='color: #FFFFFF !important;'>{madde}</span>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # ---------------------------------------------------------------------------------
-        # YAPAY ZEKA STRATEJİK KOMUTA EMİR NOTLARI PANELİ
-        # ---------------------------------------------------------------------------------
-        st.markdown("### 🧠 YAPAY ZEKA STRATEJİK KOMUTA EMİR NOTLARI")
-        st.markdown("<div class='ai-comment-box'>", unsafe_allow_html=True)
-        st.markdown(f"**🎯 Stratejik Sistem Özeti:** Hissede anlık olarak hesaplanan hibrit otonom skor 10 üzerinden **{ai_puan}** puan seviyesindedir. {sektor_durum_metni}")
-        st.markdown(f"**📋 Algoritma Analiz Gerekçeleri:**")
-        for g in gerekceler:
-            st.markdown(f"- {g}")
-        st.markdown(f"**🛡️ Komuta Merkezi Strateji Emri:** {emir_notu}")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        # ANA PİYASA DURUMU (XU100 & XU030)
+        # ==========================================
+        # 🌍 ANA PİYASA DURUMU VE OTONOM YORUM MOTORU
+        # ==========================================
         st.markdown("---")
         st.markdown("## 🌍 ANA PİYASA DURUMU (BIST 100 & 30)")
         
@@ -421,16 +400,38 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             if data.empty: return pd.DataFrame()
             if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
             data.columns = [str(c).strip().capitalize() for c in data.columns]
-            
-            data['EMA21'] = data['Close'].ewm(span=21, adjust=False).mean()
-            data['EMA50'] = data['Close'].ewm(span=50, adjust=False).mean()
-            
-            delta_idx = data['Close'].diff()
-            gain_idx = (delta_idx.where(delta_idx > 0, 0)).rolling(window=14).mean()
-            loss_idx = (-delta_idx.where(delta_idx < 0, 0)).rolling(window=14).mean()
-            rs_idx = gain_idx / (loss_idx + 1e-9)
-            data['RSI'] = 100 - (100 / (1 + rs_idx))
+            data['EMA21'] = ta.ema(data['Close'], length=21)
+            data['EMA50'] = ta.ema(data['Close'], length=50)
+            data['RSI'] = ta.rsi(data['Close'], length=14)
             return data
+
+        def endeks_yorumla(df_idx):
+            if df_idx.empty: return "Veri alınamadı.", "gray"
+            son_kapanis = float(df_idx['Close'].iloc[-1])
+            e21 = float(df_idx['EMA21'].iloc[-1])
+            e50 = float(df_idx['EMA50'].iloc[-1])
+            rsi_idx = float(df_idx['RSI'].iloc[-1])
+            
+            # Trend Yapısı Algoritması
+            if son_kapanis > e21 and e21 > e50:
+                trend = "🚀 GÜÇLÜ BOĞA PİYASASI: Endeks ana ortalamaların üzerinde, yükseliş trendi korunuyor."
+                renk = "green"
+            elif son_kapanis < e21 and e21 < e50:
+                trend = "💥 AYI PİYASASI BASKISI: Fiyat ortalamaların altında, temkinli olunmalı."
+                renk = "red"
+            else:
+                trend = "⏳ KONSOLİDASYON / KARARSIZ BÖLGE: Ortalamalar birbirine yakın, yatay seyir hakim."
+                renk = "orange"
+                
+            # Momentum / RSI Algoritması
+            if rsi_idx > 70:
+                momentum = "⚠️ AŞIRI ALIM: RSI 70 üzerinde. Kısa vadeli kâr satışlarına dikkat edilmeli."
+            elif rsi_idx < 30:
+                momentum = "🔥 AŞIRI SATIM: RSI 30 altında. Tepki alımları gelebilir."
+            else:
+                momentum = f"📊 MOMENTUM DENGELİ: RSI {rsi_idx:.2f} ile dengeli / sağlıklı bölgede."
+                
+            return f"**Trend:** {trend}\n\n**Momentum:** {momentum}", renk
 
         idx_col1, idx_col2 = st.columns(2)
         with idx_col1:
@@ -441,9 +442,17 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                 onceki_100 = df_x100['Close'].iloc[-2].item()
                 degisim_100 = ((son_100 - onceki_100) / onceki_100) * 100
                 st.metric("Puan", f"{son_100:.2f}", f"{degisim_100:.2f}%")
+                
+                # Mini Grafik
                 fig100 = go.Figure(go.Scatter(x=df_x100.index[-60:], y=df_x100['Close'].tail(60), line=dict(color='#1f77b4', width=3)))
-                fig100.update_layout(height=120, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis_visible=False, yaxis_visible=False)
+                fig100.update_layout(height=100, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis_visible=False, yaxis_visible=False)
                 st.plotly_chart(fig100, use_container_width=True)
+                
+                # Otonom Yorum Gösterimi
+                yorum_100, renk_100 = endeks_yorumla(df_x100)
+                if renk_100 == "green": st.success(yorum_100)
+                elif renk_100 == "red": st.error(yorum_100)
+                else: st.warning(yorum_100)
 
         with idx_col2:
             st.subheader("BIST 30 (XU030)")
@@ -453,9 +462,17 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                 onceki_30 = df_x030['Close'].iloc[-2].item()
                 degisim_30 = ((son_30 - onceki_30) / onceki_30) * 100
                 st.metric("Puan", f"{son_30:.2f}", f"{degisim_30:.2f}%")
+                
+                # Mini Grafik
                 fig30 = go.Figure(go.Scatter(x=df_x030.index[-60:], y=df_x030['Close'].tail(60), line=dict(color='#9C27B0', width=3)))
-                fig30.update_layout(height=120, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis_visible=False, yaxis_visible=False)
+                fig30.update_layout(height=100, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis_visible=False, yaxis_visible=False)
                 st.plotly_chart(fig30, use_container_width=True)
+                
+                # Otonom Yorum Gösterimi
+                yorum_30, renk_30 = endeks_yorumla(df_x030)
+                if renk_30 == "green": st.success(yorum_30)
+                elif renk_30 == "red": st.error(yorum_30)
+                else: st.warning(yorum_30)
 
         st.markdown("---")
         st.markdown("## 🤖 AKTİF POZİSYON TAKİP VE ALARM MERKEZİ")
@@ -513,16 +530,8 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
                 if hist.empty: continue
                 skor = 0
                 son_fiyat = hist['Close'].iloc[-1].item()
-                
-                # SAF PANDAS TEKNİK METRİKLER (RADAR)
-                ema21 = hist['Close'].ewm(span=21, adjust=False).mean().iloc[-1].item()
-                
-                delta_r = hist['Close'].diff()
-                gain_r = (delta_r.where(delta_r > 0, 0)).rolling(window=14).mean()
-                loss_r = (-delta_r.where(delta_r < 0, 0)).rolling(window=14).mean()
-                rs_r = gain_r / (loss_r + 1e-9)
-                rsi = (100 - (100 / (1 + rs_r))).iloc[-1].item()
-                
+                ema21 = ta.ema(hist['Close'], length=21).iloc[-1].item()
+                rsi = ta.rsi(hist['Close'], length=14).iloc[-1].item()
                 if son_fiyat > ema21: skor += 1
                 if 30 < rsi < 65: skor += 1
                 fk = inf.get('trailingPE', 100)
@@ -555,7 +564,7 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
         st.dataframe(styled_df, use_container_width=True, height=800)
 
 # =================================================================================
-# ÇEKİRDE• 3: FOREX & KÜRESEL PİYASALAR (ÇİFT YÖNLÜ SİSTEM)
+# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (ÇİFT YÖNLÜ SİSTEM)
 # =================================================================================
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
     st_autorefresh(interval=60000, key="global_forex_refresh")
@@ -578,33 +587,21 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
         df_fx['box_alt'] = df_fx['Low'].rolling(window=20).min()
         df_fx['box_orta'] = (df_fx['box_ust'] + df_fx['box_alt']) / 2
         
-        # 2. SAF PANDAS TEKNİK İNDİKATÖRLER (FOREX)
-        df_fx['EMA21'] = df_fx['Close'].ewm(span=21, adjust=False).mean()
-        df_fx['EMA50'] = df_fx['Close'].ewm(span=50, adjust=False).mean()
+        # 2. ATR & Teknik İndikatörler
+        df_fx['ATR'] = ta.atr(df_fx['High'], df_fx['Low'], df_fx['Close'], length=14)
+        df_fx['RSI'] = ta.rsi(df_fx['Close'], length=14)
+        df_fx['EMA21'] = ta.ema(df_fx['Close'], length=21)
+        df_fx['EMA50'] = ta.ema(df_fx['Close'], length=50)
         
-        # SAF PANDAS FOREX RSI
-        delta_fx = df_fx['Close'].diff()
-        gain_fx = (delta_fx.where(delta_fx > 0, 0)).rolling(window=14).mean()
-        loss_fx = (-delta_fx.where(delta_fx < 0, 0)).rolling(window=14).mean()
-        rs_fx = gain_fx / (loss_fx + 1e-9)
-        df_fx['RSI'] = 100 - (100 / (1 + rs_fx))
+        son_fiyat = float(df_fx['Close'].iloc[-1])
+        atr_val = float(df_fx['ATR'].iloc[-1])
+        rsi_val = float(df_fx['RSI'].iloc[-1])
+        b_ust = float(df_fx['box_ust'].iloc[-2])
+        b_alt = float(df_fx['box_alt'].iloc[-2])
+        ema21 = float(df_fx['EMA21'].iloc[-1])
+        ema50 = float(df_fx['EMA50'].iloc[-1])
         
-        # SAF PANDAS ATR (TRUE RANGE ORTALAMASI)
-        high_low = df_fx['High'] - df_fx['Low']
-        high_cp = (df_fx['High'] - df_fx['Close'].shift()).abs()
-        low_cp = (df_fx['Low'] - df_fx['Close'].shift()).abs()
-        tr = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
-        df_fx['ATR'] = tr.rolling(window=14).mean()
-        
-        son_fiyat = float(df_fx['Close'].iloc[-1].item())
-        atr_val = float(df_fx['ATR'].iloc[-1].item())
-        rsi_val = float(df_fx['RSI'].iloc[-1].item())
-        b_ust = float(df_fx['box_ust'].iloc[-2].item())
-        b_alt = float(df_fx['box_alt'].iloc[-2].item())
-        ema21 = float(df_fx['EMA21'].iloc[-1].item())
-        ema50 = float(df_fx['EMA50'].iloc[-1].item())
-        
-        # 3. ÇİFT YÖNLÜ KARAR MOTORU (SKORLAMA & YÖN TAYİNİ)
+        # 3. ÇİFT YÖNLÜ KARAR MOTORU
         long_skor = 0.0
         short_skor = 0.0
         nedenler = []
@@ -705,10 +702,14 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             
             fig_fx = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.7, 0.3])
             
+            # Ana Mum Grafiği
             fig_fx.add_trace(go.Candlestick(x=df_fx.index, open=df_fx['Open'], high=df_fx['High'], low=df_fx['Low'], close=df_fx['Close'], name="Fiyat"), row=1, col=1)
+            
+            # Kristal Box Kanalları
             fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_ust'], line=dict(color='#8E44AD', width=1.5, dash='dash'), name="Box Üst Tavan"), row=1, col=1)
             fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_alt'], line=dict(color='#8E44AD', width=1.5, dash='dash'), name="Box Alt Taban"), row=1, col=1)
             
+            # Trend Ortalamaları
             fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA21'], line=dict(color='#E67E22', width=1.2), name="EMA 21"), row=1, col=1)
             fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA50'], line=dict(color='#3498DB', width=1.2), name="EMA 50"), row=1, col=1)
             
@@ -716,13 +717,10 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[tp_noktasi, tp_noktasi], line=dict(color='#2ECC71', width=2.5), name="Hedef (TP)"), row=1, col=1)
                 fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sl_noktasi, sl_noktasi], line=dict(color='#E74C3C', width=2.5), name="Risk Sınırı (SL)"), row=1, col=1)
             
+            # Alt RSI Panel Çizimi
             fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['RSI'], line=dict(color='#16A085', width=1.5), name="RSI"), row=2, col=1)
-            
-            # Convert timezone-naive timestamp limits for plotly line plotting safely
-            t_start = df_fx.index[0]
-            t_end = df_fx.index[-1]
-            fig_fx.add_trace(go.Scatter(x=[t_start, t_end], y=[70, 70], line=dict(color='rgba(231, 76, 60, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
-            fig_fx.add_trace(go.Scatter(x=[t_start, t_end], y=[30, 30], line=dict(color='rgba(46, 204, 113, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
+            fig_fx.add_trace(go.Scatter(x=[df_fx.index[0], df_fx.index[-1]], y=[70, 70], line=dict(color='rgba(231, 76, 60, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
+            fig_fx.add_trace(go.Scatter(x=[df_fx.index[0], df_fx.index[-1]], y=[30, 30], line=dict(color='rgba(46, 204, 113, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
             
             fig_fx.update_layout(xaxis_rangeslider_visible=False, height=650, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10))
             st.plotly_chart(fig_fx, use_container_width=True)
