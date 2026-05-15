@@ -73,7 +73,7 @@ forex_assets = {
     "DXY (Dolar Endeksi)": "DX-Y.NYB",
     "DAX 40 (Almanya)": "^GDAXI",
     "ONS BAKIR" : "HG=F",
-    "ONS PALADYUM": "XPDUSD=X",
+    "ONS PALADYUM": "PA=F",
     "USD/JPY": "USDJPY=X",
     "ETH/USD": "ETH-USD",
     "ONS PLATİN": "PL=F"
