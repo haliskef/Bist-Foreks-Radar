@@ -92,7 +92,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         secilen_int = st.selectbox("VERİ SIKLIĞI", list(zaman_sozlugu.keys()), index=2)
         view_period = st.selectbox("GÖRÜNÜM ARALIĞI", ["1 Ay", "3 Ay", "6 Ay", "1 Yıl", "Tümü"], index=2)
 
-    @st.cache_data(ttl=15)
+    @st.cache_data(ttl=60)
     def get_full_data(kod, interval):
         try:
             ticker = yf.Ticker(kod)
