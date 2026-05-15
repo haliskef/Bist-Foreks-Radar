@@ -71,12 +71,12 @@ forex_assets = {
     "S&P 500": "^GSPC",
     "NASDAQ 100": "^NDX",
     "DXY (Dolar Endeksi)": "DX-Y.NYB",
-    "DAX 40 (Almanya)": "^GDAXI"
+    "DAX 40 (Almanya)": "^GDAXI",
     "ONS BAKIR" : "HG=F",
     "ONS PALADYUM": "XPDUSD=X",
     "USD/JPY": "USDJPY=X",
     "ETH/USD": "ETH-USD",
-    "ONS PLATİN": "PL=F",
+    "ONS PLATİN": "PL=F"
 }
 
 # =================================================================================
