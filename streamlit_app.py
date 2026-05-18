@@ -617,13 +617,14 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
     
     fx_tab1, fx_tab2 = st.tabs(["📊 Otonom Teknik Analiz & PA", "📅 Canlı Ekonomik Takvim & Makro Etki"])
     
-    with fx_tab2:
-        st.markdown("### 📰 Küresel Makroekonomik Takvim (Anlık Akış)")
+with fx_tab2:
+        st.markdown("### 📰 Küresel Makroekonomik Takvim (Geniş Ekran Akışı)")
         st.warning("⚠️ **Volatilite Uyarısı:** Yüksek etkili (3 Yıldızlı / Kırmızı) verilerin açıklanma saatlerinde teknik indikatörler devredışı kalabilir. Haber saatinden 15 dk önce ve sonra işlem riskini minimuma indirin.")
         
+        # TradingView Ekonomik Takvim Widget'ı (Genişletilmiş ve Yükseltilmiş Mimari)
         ekonomik_takvim_html = """
-        <div class="tradingview-widget-container" style="width: 100%; height: 600px;">
-          <div class="tradingview-widget-container__widget"></div>
+        <div class="tradingview-widget-container" style="width: 100%; height: 800px; margin: 0 auto;">
+          <div class="tradingview-widget-container__widget" style="width: 100%; height: 100%;"></div>
           <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
           {
           "colorTheme": "light",
@@ -635,6 +636,9 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
           }
           </script>
         </div>
+        """
+        # Streamlit iframe alanını dikeyde 850 piksele çekerek alt alta olan verilerin sıkışmasını engelledik
+        st.components.v1.html(ekonomik_takvim_html, height=850, scrolling=True)
         """
         st.components.v1.html(ekonomik_takvim_html, height=620)
         
