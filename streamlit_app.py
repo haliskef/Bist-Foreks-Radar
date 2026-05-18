@@ -604,6 +604,7 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 
 # =================================================================================
 # =================================================================================
+# =================================================================================
 # ÇEKİRDEK 3: FOREX & EMTİA & KRİPTO RADARI (PRICE ACTION & PUANLAMA ENTEGRELİ)
 # =================================================================================
 elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
@@ -748,7 +749,7 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
         with grid_cols[idx % 3]:
             st.markdown(f"""
             <div style="background-color: #FFFFFF; padding: 20px; border-radius: 12px; border: 2px solid #1A1A1A; margin-bottom: 25px; box-shadow: 4px 4px 0px #1A1A1A;">
-                <h3 style="margin-0; border-bottom: 2px solid #1A1A1A; padding-bottom: 5px;">{symbol_names[sym]}</h3>
+                <h3 style="margin: 0; border-bottom: 2px solid #1A1A1A; padding-bottom: 5px;">{symbol_names[sym]}</h3>
                 <p style="font-size: 1.5rem; margin: 10px 0; color: #111;">Fiyat: <span style="font-weight:900;">{son_fiyat:.2f}</span></p>
             </div>
             """, unsafe_allow_html=True)
@@ -793,7 +794,7 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
             fig_fx.add_trace(go.Scatter(x=df_plot_fx.index, y=df_plot_fx['EMA21'], line=dict(color='#2ECC71', width=1.2), name="EMA 21"), row=1, col=1)
             fig_fx.add_trace(go.Scatter(x=df_plot_fx.index, y=df_plot_fx['EMA50'], line=dict(color='#3498DB', width=1.2), name="EMA 50"), row=1, col=1)
             
-            if Strateji_yönü != "NÖTR (İZLE)":
+            if strateji_yönü != "NÖTR (İZLE)":
                 fig_fx.add_trace(go.Scatter(x=[df_plot_fx.index[-15], df_plot_fx.index[-1]], y=[tp_noktasi, tp_noktasi], line=dict(color='#2ECC71', width=2, dash='dash'), name="TP"), row=1, col=1)
                 fig_fx.add_trace(go.Scatter(x=[df_plot_fx.index[-15], df_plot_fx.index[-1]], y=[sl_noktasi, sl_noktasi], line=dict(color='#E74C3C', width=2, dash='dash'), name="SL"), row=1, col=1)
             
