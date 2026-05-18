@@ -605,239 +605,252 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 # =================================================================================
 # =================================================================================
 # =================================================================================
-# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (PRICE ACTION & ÇİFT YÖNLÜ SİSTEM)
+# =================================================================================
+# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (PRICE ACTION & GİRİŞ SEVİYESİ ENTEGRELİ)
 # =================================================================================
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
-    st_autorefresh(interval=60000, key="global_forex_refresh_v2")
+    st_autorefresh(interval=60000, key="global_forex_refresh_v4_levels")
     st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ")
     
     secilen_forex_adi = st.selectbox("Analiz Edilecek Küresel Enstrüman:", list(forex_assets.keys()))
     forex_ticker = forex_assets[secilen_forex_adi]
     
-    try:
-        df_fx = yf.download(tickers=forex_ticker, period="1mo", interval="1h", progress=False)
-    except:
-        df_fx = pd.DataFrame()
+    fx_tab1, fx_tab2 = st.tabs(["📊 Otonom Teknik Analiz & PA", "📅 Canlı Ekonomik Takvim & Makro Etki"])
+    
+    with fx_tab2:
+        st.markdown("### 📰 Küresel Makroekonomik Takvim (Anlık Akış)")
+        st.warning("⚠️ **Volatilite Uyarısı:** Yüksek etkili (3 Yıldızlı / Kırmızı) verilerin açıklanma saatlerinde teknik indikatörler devredışı kalabilir. Haber saatinden 15 dk önce ve sonra işlem riskini minimuma indirin.")
         
-    if not df_fx.empty and len(df_fx) > 25:
-        if isinstance(df_fx.columns, pd.MultiIndex): df_fx.columns = df_fx.columns.get_level_values(0)
-        df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
+        ekonomik_takvim_html = """
+        <div class="tradingview-widget-container" style="width: 100%; height: 600px;">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+          {
+          "colorTheme": "light",
+          "isWidescreen": true,
+          "width": "100%",
+          "height": "100%",
+          "locale": "tr",
+          "importanceFilter": "-1,0,1"
+          }
+          </script>
+        </div>
+        """
+        st.components.v1.html(ekonomik_takvim_html, height=620)
         
-        # 1. Kristal Box Hesaplamaları (Donchian)
-        df_fx['box_ust'] = df_fx['High'].rolling(window=20).max()
-        df_fx['box_alt'] = df_fx['Low'].rolling(window=20).min()
-        df_fx['box_orta'] = (df_fx['box_ust'] + df_fx['box_alt']) / 2
-        
-        # 2. Native ATR & Teknik İndikatör Hesaplamaları
-        high_low = df_fx['High'] - df_fx['Low']
-        high_close = (df_fx['High'] - df_fx['Close'].shift()).abs()
-        low_close = (df_fx['Low'] - df_fx['Close'].shift()).abs()
-        ranges = pd.concat([high_low, high_close, low_close], axis=1)
-        true_range = ranges.max(axis=1)
-        df_fx['ATR'] = true_range.ewm(alpha=1/14, adjust=False).mean()
-        
-        fx_delta = df_fx['Close'].diff()
-        fx_gain = fx_delta.clip(lower=0)
-        fx_loss = -fx_delta.clip(upper=0)
-        fx_avg_gain = fx_gain.ewm(com=13, adjust=False).mean()
-        fx_avg_loss = fx_loss.ewm(com=13, adjust=False).mean()
-        fx_rs = fx_avg_gain / fx_avg_loss
-        df_fx['RSI'] = 100 - (100 / (1 + fx_rs))
-        
-        df_fx['EMA21'] = df_fx['Close'].ewm(span=21, adjust=False).mean()
-        df_fx['EMA50'] = df_fx['Close'].ewm(span=50, adjust=False).mean()
-        
-        son_fiyat = float(df_fx['Close'].iloc[-1])
-        atr_val = float(df_fx['ATR'].iloc[-1])
-        rsi_val = float(df_fx['RSI'].iloc[-1])
-        b_ust = float(df_fx['box_ust'].iloc[-2])
-        b_alt = float(df_fx['box_alt'].iloc[-2])
-        ema21 = float(df_fx['EMA21'].iloc[-1])
-        ema50 = float(df_fx['EMA50'].iloc[-1])
-        
-        # 3. YENİ: PRICE ACTION SINIFLANDIRICI KATMANI
-        son_mum = df_fx.iloc[-1]
-        onceki_mum = df_fx.iloc[-2]
-        
-        mum_boyu = son_mum['High'] - son_mum['Low']
-        alt_fitil = min(son_mum['Open'], son_mum['Close']) - son_mum['Low']
-        ust_fitil = son_mum['High'] - max(son_mum['Open'], son_mum['Close'])
-        
-        # Pin Bar Tespiti
-        is_bullish_pin = (alt_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False
-        is_bearish_pin = (ust_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False
-        
-        # Engulfing (Yutan Mum) Tespiti
-        is_bullish_engulfing = (onceki_mum['Close'] < onceki_mum['Open']) and (son_mum['Close'] > son_mum['Open']) and (son_mum['Close'] > onceki_mum['Open'])
-        is_bearish_engulfing = (onceki_mum['Close'] > onceki_mum['Open']) and (son_mum['Close'] < son_mum['Open']) and (son_mum['Close'] < onceki_mum['Open'])
-        
-        # MSB / CHoCH (Market Yapısı Kırılımı) Takibi - Son 5 mumdaki ekstremum tepe/diplerin kırılımı
-        son_ekstrem_zirve = df_fx['High'].tail(15).iloc[:-1].max()
-        son_ekstrem_dip = df_fx['Low'].tail(15).iloc[:-1].min()
-        is_msb_bullish = son_fiyat > son_ekstrem_zirve
-        is_msb_bearish = son_fiyat < son_ekstrem_dip
-
-        # 4. ÇİFT YÖNLÜ KARAR & PUANLAMA MOTORU
-        long_skor = 0.0
-        short_skor = 0.0
-        nedenler = []
-        
-        # Kristal Box Kırılım Analizi
-        if son_fiyat > b_ust:
-            long_skor += 3.5
-            nedenler.append("🟩 KRİSTAL BOX: Üst band yukarı yönlü kırıldı (Long +3.5)")
-        elif son_fiyat < b_alt:
-            short_skor += 3.5
-            nedenler.append("🟥 KRİSTAL BOX: Alt band aşağı yönlü kırıldı (Short +3.5)")
-        else:
-            long_skor += 0.5
-            short_skor += 0.5
-            nedenler.append("🟨 KRİSTAL BOX: Fiyat kutu içinde konsolide oluyor (Nötr +0.5)")
+    with fx_tab1:
+        try:
+            df_fx = yf.download(tickers=forex_ticker, period="1mo", interval="1h", progress=False)
+        except:
+            df_fx = pd.DataFrame()
             
-        # Gann / EMA Trend Yapısı Analizi
-        if son_fiyat > ema21 and ema21 > ema50:
-            long_skor += 3.0
-            nedenler.append("🟩 GANN/TREND: EMA'lar boğa diziliminde ve fiyat üstünde (Long +3.0)")
-        elif son_fiyat < ema21 and ema21 < ema50:
-            short_skor += 3.0
-            nedenler.append("🟥 GANN/TREND: EMA'lar ayı diziliminde ve fiyat altında (Short +3.0)")
-        else:
-            nedenler.append("🟨 GANN/TREND: Hareketli ortalamalar kararsız bölgede")
+        if not df_fx.empty and len(df_fx) > 25:
+            if isinstance(df_fx.columns, pd.MultiIndex): df_fx.columns = df_fx.columns.get_level_values(0)
+            df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
             
-        # RSI / Momentum Analizi
-        if 50 < rsi_val < 70:
-            long_skor += 1.5
-            nedenler.append("🟩 MOMENTUM: RSI yükseliş trendini destekliyor (Long +1.5)")
-        elif 30 < rsi_val <= 50:
-            short_skor += 1.5
-            nedenler.append("🟥 MOMENTUM: RSI düşüş eğilimini destekliyor (Short +1.5)")
-        elif rsi_val >= 70:
-            short_skor += 1.0
-            nedenler.append("⚠️ MOMENTUM: Aşırı Alım! Short yönlü dönüş tetiklenebilir (Short +1.0)")
-        elif rsi_val <= 30:
-            long_skor += 1.0
-            nedenler.append("⚠️ MOMENTUM: Aşırı Satım! Long yönlü tepki tetiklenebilir (Long +1.0)")
-
-        # YENİ: Price Action Kurumsal Onay Skorları (Max +2.0 Puan Etkisi)
-        if is_bullish_pin:
-            long_skor += 1.5
-            nedenler.append("🔥 PRICE ACTION: Boğa Pin Bar (Dipten Reddedilme) oluştu (Long +1.5)")
-        if is_bullish_engulfing:
-            long_skor += 1.5
-            nedenler.append("🔥 PRICE ACTION: Bullish Engulfing (Yutan Boğa Mumu) görüldü (Long +1.5)")
-        if is_msb_bullish:
-            long_skor += 1.0
-            nedenler.append("⚔️ PRICE ACTION: Market Yapısı Boğa yönlü kırıldı (MSB/CHoCH) (Long +1.0)")
+            # 1. Kristal Box Hesaplamaları (Donchian)
+            df_fx['box_ust'] = df_fx['High'].rolling(window=20).max()
+            df_fx['box_alt'] = df_fx['Low'].rolling(window=20).min()
+            df_fx['box_orta'] = (df_fx['box_ust'] + df_fx['box_alt']) / 2
             
-        if is_bearish_pin:
-            short_skor += 1.5
-            nedenler.append("❄️ PRICE ACTION: Ayı Pin Bar (Tepeden Reddedilme) oluştu (Short +1.5)")
-        if is_bearish_engulfing:
-            short_skor += 1.5
-            nedenler.append("❄️ PRICE ACTION: Bearish Engulfing (Yutan Ayı Mumu) görüldü (Short +1.5)")
-        if is_msb_bearish:
-            short_skor += 1.0
-            nedenler.append("⚔️ PRICE ACTION: Market Yapısı Ayı yönlü kırıldı (MSB/CHoCH) (Short +1.0)")
-
-        # Skorları Üst Sınıra Limitle (Max: 10.0)
-        long_skor = min(10.0, round(long_skor, 1))
-        short_skor = min(10.0, round(short_skor, 1))
-
-        # Yön ve Strateji Belirleme
-        if long_skor >= 7.0 and long_skor >= short_skor:
-            strateji_yonu = "LONG (YUKARI)"
-            ana_skor = long_skor
-            durum_color = "#2ECC71"
-            durum_msg = "🚀 GÜÇLÜ BOĞA - YUKARI İŞLEM AÇILABİLİR"
-            sl_noktasi = son_fiyat - (atr_val * 1.5)
-            tp_noktasi = son_fiyat + (atr_val * 3.0)
-        elif short_skor >= 7.0 and short_skor > long_skor:
-            strateji_yonu = "SHORT (AŞAĞI)"
-            ana_skor = short_skor
-            durum_color = "#E74C3C"
-            durum_msg = "💥 GÜÇLÜ AYI - AŞAĞI (AÇIĞA SATIŞ) İŞLEM UYGUN"
-            sl_noktasi = son_fiyat + (atr_val * 1.5)
-            tp_noktasi = son_fiyat - (atr_val * 3.0)
-        else:
-            strateji_yonu = "NÖTR (İZLE)"
-            ana_skor = max(long_skor, short_skor)
-            durum_color = "#F1C40F"
-            durum_msg = "🟡 TEST BÖLGESİ - YÖN BELİRSİZ, KIRILIM BEKLEYİN"
-            sl_noktasi = son_fiyat - (atr_val * 2.0)
-            tp_noktasi = son_fiyat + (atr_val * 2.0)
-
-        # Savaş Kartı Gösterimi
-        st.markdown(f"""
-            <div style="background-color: {durum_color}; padding: 25px; border-radius: 15px; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
-                <h1 style="color: #FFFFFF !important; border: none; margin: 0; font-size: 2.2rem;">{secilen_forex_adi} // STRATEJİ: {strateji_yonu}</h1>
-                <h3 style="color: #FFFFFF !important; border: none; margin: 8px 0 0 0; font-weight: 800;">{durum_msg} (Sistem Ağırlıklı Ortalaması: {ana_skor:.1f}/10)</h3>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # METRIC SENSÖRLERİ
-        f1, f2, f3, f4 = st.columns(4)
-        f1.metric("ANLIK FİYAT", f"{son_fiyat:.4f}")
-        f2.metric("OYNK_ALANI (ATR)", f"{atr_val:.4f}")
-        f3.metric("🎯 OTONOM TP (KAR AL)", f"{tp_noktasi:.4f}")
-        f4.metric("🛑 OTONOM SL (ZARAR KES)", f"{sl_noktasi:.4f}")
-
-        # PANEL YERLEŞİMİ
-        sol_p, sag_p = st.columns([1, 2])
-        
-        with sol_p:
-            st.markdown("### 🧠 Çift Yönlü Sistem Ortalaması")
+            # 2. Native ATR & Teknik İndikatör Hesaplamaları
+            high_low = df_fx['High'] - df_fx['Low']
+            high_close = (df_fx['High'] - df_fx['Close'].shift()).abs()
+            low_close = (df_fx['Low'] - df_fx['Close'].shift()).abs()
+            ranges = pd.concat([high_low, high_close, low_close], axis=1)
+            true_range = ranges.max(axis=1)
+            df_fx['ATR'] = true_range.ewm(alpha=1/14, adjust=False).mean()
             
-            # Long İlerleme Çubuğu
-            st.markdown(f"**🟢 Long Algoritma Ağırlığı:** `{long_skor} / 10`")
-            st.markdown(f"""
-            <div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 12px;">
-                <div style="width: {int(long_skor*10)}%; background-color: #2ECC71; height: 100%; border-radius: 4px;"></div>
-            </div>
-            """, unsafe_allow_html=True)
+            fx_delta = df_fx['Close'].diff()
+            fx_gain = fx_delta.clip(lower=0)
+            fx_loss = -fx_delta.clip(upper=0)
+            fx_avg_gain = fx_gain.ewm(com=13, adjust=False).mean()
+            fx_avg_loss = fx_loss.ewm(com=13, adjust=False).mean()
+            fx_rs = fx_avg_gain / fx_avg_loss
+            df_fx['RSI'] = 100 - (100 / (1 + fx_rs))
             
-            # Short İlerleme Çubuğu
-            st.markdown(f"**🔴 Short Algoritma Ağırlığı:** `{short_skor} / 10`")
-            st.markdown(f"""
-            <div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 20px;">
-                <div style="width: {int(short_skor*10)}%; background-color: #E74C3C; height: 100%; border-radius: 4px;"></div>
-            </div>
-            """, unsafe_allow_html=True)
+            df_fx['EMA21'] = df_fx['Close'].ewm(span=21, adjust=False).mean()
+            df_fx['EMA50'] = df_fx['Close'].ewm(span=50, adjust=False).mean()
             
-            st.markdown("#### 🔍 Sinyal Gerekçeleri")
-            for neden in nedenler:
-                st.write(f"- {neden}")
+            son_fiyat = float(df_fx['Close'].iloc[-1])
+            atr_val = float(df_fx['ATR'].iloc[-1])
+            rsi_val = float(df_fx['RSI'].iloc[-1])
+            b_ust = float(df_fx['box_ust'].iloc[-2])
+            b_alt = float(df_fx['box_alt'].iloc[-2])
+            ema21 = float(df_fx['EMA21'].iloc[-1])
+            ema50 = float(df_fx['EMA50'].iloc[-1])
+            
+            # Sinyal Tetiklenme Seviyesi İçin Kapanış Fiyatı
+            sinyal_tetik_fiyati = son_fiyat
+            
+            # 3. PRICE ACTION SINIFLANDIRICI KATMANI
+            son_mum = df_fx.iloc[-1]
+            onceki_mum = df_fx.iloc[-2]
+            
+            mum_boyu = son_mum['High'] - son_mum['Low']
+            alt_fitil = min(son_mum['Open'], son_mum['Close']) - son_mum['Low']
+            ust_fitil = son_mum['High'] - max(son_mum['Open'], son_mum['Close'])
+            
+            is_bullish_pin = (alt_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False
+            is_bearish_pin = (ust_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False
+            
+            is_bullish_engulfing = (onceki_mum['Close'] < onceki_mum['Open']) and (son_mum['Close'] > son_mum['Open']) and (son_mum['Close'] > onceki_mum['Open'])
+            is_bearish_engulfing = (onceki_mum['Close'] > onceki_mum['Open']) and (son_mum['Close'] < son_mum['Open']) and (son_mum['Close'] < onceki_mum['Open'])
+            
+            son_ekstrem_zirve = df_fx['High'].tail(15).iloc[:-1].max()
+            son_ekstrem_dip = df_fx['Low'].tail(15).iloc[:-1].min()
+            is_msb_bullish = son_fiyat > son_ekstrem_zirve
+            is_msb_bearish = son_fiyat < son_ekstrem_dip
+
+            # 4. ÇİFT YÖNLÜ KARAR & PUANLAMA MOTORU
+            long_skor = 0.0
+            short_skor = 0.0
+            nedenler = []
+            
+            if son_fiyat > b_ust:
+                long_skor += 3.5
+                nedenler.append("🟩 KRİSTAL BOX: Üst band yukarı yönlü kırıldı (Long +3.5)")
+            elif son_fiyat < b_alt:
+                short_skor += 3.5
+                nedenler.append("🟥 KRİSTAL BOX: Alt band aşağı yönlü kırıldı (Short +3.5)")
+            else:
+                long_skor += 0.5
+                short_skor += 0.5
+                nedenler.append("🟨 KRİSTAL BOX: Fiyat kutu içinde konsolide oluyor (Nötr +0.5)")
                 
-            st.markdown("#### 🔬 Teknik Değerler")
-            st.write(f"**RSI Göstergesi:** {rsi_val:.2f}")
-            st.write(f"**Kristal Tavan (Box Üst):** {b_ust:.4f}")
-            st.write(f"**Kristal Taban (Box Alt):** {b_alt:.4f}")
+            if son_fiyat > ema21 and ema21 > ema50:
+                long_skor += 3.0
+                nedenler.append("🟩 GANN/TREND: EMA'lar boğa diziliminde ve fiyat üstünde (Long +3.0)")
+            elif son_fiyat < ema21 and ema21 < ema50:
+                short_skor += 3.0
+                nedenler.append("🟥 GANN/TREND: EMA'lar ayı diziliminde ve fiyat altında (Short +3.0)")
+            else:
+                nedenler.append("🟨 GANN/TREND: Hareketli ortalamalar kararsız bölgede")
+                
+            if 50 < rsi_val < 70:
+                long_skor += 1.5
+                nedenler.append("🟩 MOMENTUM: RSI yükseliş trendini destekliyor (Long +1.5)")
+            elif 30 < rsi_val <= 50:
+                short_skor += 1.5
+                nedenler.append("🟥 MOMENTUM: RSI düşüş eğilimini destekliyor (Short +1.5)")
+            elif rsi_val >= 70:
+                short_skor += 1.0
+                nedenler.append("⚠️ MOMENTUM: Aşırı Alım! Short yönlü dönüş tetiklenebilir (Short +1.0)")
+            elif rsi_val <= 30:
+                long_skor += 1.0
+                nedenler.append("⚠️ MOMENTUM: Aşırı Satım! Long yönlü tepki tetiklenebilir (Long +1.0)")
 
-        with sag_p:
-            st.markdown("### 📈 Çift Yönlü Grafik ve Hedef Haritası")
-            
-            fig_fx = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.7, 0.3])
-            
-            # Ana Mum Grafiği
-            fig_fx.add_trace(go.Candlestick(x=df_fx.index, open=df_fx['Open'], high=df_fx['High'], low=df_fx['Low'], close=df_fx['Close'], name="Fiyat"), row=1, col=1)
-            
-            # Kristal Box Kanalları
-            fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_ust'], line=dict(color='#8E44AD', width=1.5, dash='dash'), name="Box Üst Tavan"), row=1, col=1)
-            fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_alt'], line=dict(color='#8E44AD', width=1.5, dash='dash'), name="Box Alt Taban"), row=1, col=1)
-            
-            # Trend Ortalamaları
-            fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA21'], line=dict(color='#E67E22', width=1.2), name="EMA 21"), row=1, col=1)
-            fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA50'], line=dict(color='#3498DB', width=1.2), name="EMA 50"), row=1, col=1)
-            
+            if is_bullish_pin:
+                long_skor += 1.5
+                nedenler.append("🔥 PRICE ACTION: Boğa Pin Bar (Dipten Reddedilme) oluştu (Long +1.5)")
+            if is_bullish_engulfing:
+                long_skor += 1.5
+                nedenler.append("🔥 PRICE ACTION: Bullish Engulfing (Yutan Boğa Mumu) görüldü (Long +1.5)")
+            if is_msb_bullish:
+                long_skor += 1.0
+                nedenler.append("⚔️ PRICE ACTION: Market Yapısı Boğa yönlü kırıldı (MSB/CHoCH) (Long +1.0)")
+                
+            if is_bearish_pin:
+                short_skor += 1.5
+                nedenler.append("❄️ PRICE ACTION: Ayı Pin Bar (Tepeden Reddedilme) oluştu (Short +1.5)")
+            if is_bearish_engulfing:
+                short_skor += 1.5
+                nedenler.append("❄️ PRICE ACTION: Bearish Engulfing (Yutan Ayı Mumu) görüldü (Short +1.5)")
+            if is_msb_bearish:
+                short_skor += 1.0
+                nedenler.append("⚔️ PRICE ACTION: Market Yapısı Ayı yönlü kırıldı (MSB/CHoCH) (Short +1.0)")
+
+            long_skor = min(10.0, round(long_skor, 1))
+            short_skor = min(10.0, round(short_skor, 1))
+
+            if long_skor >= 7.0 and long_skor >= short_skor:
+                strateji_yonu = "LONG (YUKARI)"
+                ana_skor = long_skor
+                durum_color = "#2ECC71"
+                durum_msg = f"🚀 GÜÇLÜ BOĞA - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN İŞLEM TAVSİYESİ"
+                sl_noktasi = son_fiyat - (atr_val * 1.5)
+                tp_noktasi = son_fiyat + (atr_val * 3.0)
+            elif short_skor >= 7.0 and short_skor > long_skor:
+                strateji_yonu = "SHORT (AŞAĞI)"
+                ana_skor = short_skor
+                durum_color = "#E74C3C"
+                durum_msg = f"💥 GÜÇLÜ AYI - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN AÇIĞA SATIŞ TAVSİYESİ"
+                sl_noktasi = son_fiyat + (atr_val * 1.5)
+                tp_noktasi = son_fiyat - (atr_val * 3.0)
+            else:
+                strateji_yonu = "NÖTR (İZLE)"
+                ana_skor = max(long_skor, short_skor)
+                durum_color = "#F1C40F"
+                durum_msg = "🟡 TEST BÖLGESİ - BELİRLİ BİR SEVİYE KIRILIMI BEKLENİYOR"
+                sl_noktasi = son_fiyat - (atr_val * 2.0)
+                tp_noktasi = son_fiyat + (atr_val * 2.0)
+
+            # Savaş Kartı Gösterimi (Dinamik Fiyat Ekli)
+            st.markdown(f"""
+                <div style="background-color: {durum_color}; padding: 25px; border-radius: 15px; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
+                    <h1 style="color: #FFFFFF !important; border: none; margin: 0; font-size: 2.2rem;">{secilen_forex_adi} // STRATEJİ: {strateji_yonu}</h1>
+                    <h3 style="color: #FFFFFF !important; border: none; margin: 8px 0 0 0; font-weight: 800;">{durum_msg} (Sistem Güven Skoru: {ana_skor:.1f}/10)</h3>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # METRIC SENSÖRLERİ
+            f1, f2, f3, f4 = st.columns(4)
             if strateji_yonu != "NÖTR (İZLE)":
-                fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[tp_noktasi, tp_noktasi], line=dict(color='#2ECC71', width=2.5), name="Hedef (TP)"), row=1, col=1)
-                fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sl_noktasi, sl_noktasi], line=dict(color='#E74C3C', width=2.5), name="Risk Sınırı (SL)"), row=1, col=1)
+                f1.metric("🎯 SİNYAL GİRİŞ SEVİYESİ", f"{sinyal_tetik_fiyati:.4f}", help="Sinyalin algoritma tarafından onaylandığı fiyat seviyesi.")
+            else:
+                f1.metric("ANLIK FİYAT", f"{son_fiyat:.4f}")
+            f2.metric("OYNK_ALANI (ATR)", f"{atr_val:.4f}")
+            f3.metric("🎯 OTONOM TP (KAR AL)", f"{tp_noktasi:.4f}")
+            f4.metric("🛑 OTONOM SL (ZARAR KES)", f"{sl_noktasi:.4f}")
+
+            # PANEL YERLEŞİMİ
+            sol_p, sag_p = st.columns([1, 2])
             
-            # Alt RSI Panel Çizimi
-            fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['RSI'], line=dict(color='#16A085', width=1.5), name="RSI"), row=2, col=1)
-            fig_fx.add_trace(go.Scatter(x=[df_fx.index[0], df_fx.index[-1]], y=[70, 70], line=dict(color='rgba(231, 76, 60, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
-            fig_fx.add_trace(go.Scatter(x=[df_fx.index[0], df_fx.index[-1]], y=[30, 30], line=dict(color='rgba(46, 204, 113, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
-            
-            fig_fx.update_layout(xaxis_rangeslider_visible=False, height=650, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10))
-            st.plotly_chart(fig_fx, use_container_width=True)
-    else:
-        st.error("Küresel piyasa verileri çekilemedi. Bağlantınızı kontrol edin.")
+            with sol_p:
+                st.markdown("### 🧠 Çift Yönlü Sistem Ortalaması")
+                
+                st.markdown(f"**🟢 Long Algoritma Ağırlığı:** `{long_skor} / 10`")
+                st.markdown(f"""
+                <div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 12px;">
+                    <div style="width: {int(long_skor*10)}%; background-color: #2ECC71; height: 100%; border-radius: 4px;"></div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.markdown(f"**🔴 Short Algoritma Ağırlığı:** `{short_skor} / 10`")
+                st.markdown(f"""
+                <div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 20px;">
+                    <div style="width: {int(short_skor*10)}%; background-color: #E74C3C; height: 100%; border-radius: 4px;"></div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                st.markdown("#### 🔍 Sinyal Gerekçeleri")
+                for neden in nedenler:
+                    st.write(f"- {neden}")
+                    
+                st.markdown("#### 🔬 Teknik Değerler")
+                st.write(f"**RSI Göstergesi:** {rsi_val:.2f}")
+                st.write(f"**Kristal Tavan (Box Üst):** {b_ust:.4f}")
+                st.write(f"**Kristal Taban (Box Alt):** {b_alt:.4f}")
+
+            with sag_p:
+                st.markdown("### 📈 Çift Yönlü Grafik ve Hedef Haritası")
+                fig_fx = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.7, 0.3])
+                fig_fx.add_trace(go.Candlestick(x=df_fx.index, open=df_fx['Open'], high=df_fx['High'], low=df_fx['Low'], close=df_fx['Close'], name="Fiyat"), row=1, col=1)
+                fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_ust'], line=dict(color='#8E44AD', width=1.5, dash='dash'), name="Box Üst Tavan"), row=1, col=1)
+                fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_alt'], line=dict(color='#8E44AD', width=1.5, dash='dash'), name="Box Alt Taban"), row=1, col=1)
+                fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA21'], line=dict(color='#E67E22', width=1.2), name="EMA 21"), row=1, col=1)
+                fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA50'], line=dict(color='#3498DB', width=1.2), name="EMA 50"), row=1, col=1)
+                
+                if strateji_yonu != "NÖTR (İZLE)":
+                    fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[tp_noktasi, tp_noktasi], line=dict(color='#2ECC71', width=2.5), name="Hedef (TP)"), row=1, col=1)
+                    fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sl_noktasi, sl_noktasi], line=dict(color='#E74C3C', width=2.5), name="Risk Sınırı (SL)"), row=1, col=1)
+                    # Grafik üzerine sinyal giriş seviyesi çizgisi ekleme
+                    fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sinyal_tetik_fiyati, sinyal_tetik_fiyati], line=dict(color='#111111', width=2, dash='dot'), name="Giriş Seviyesi"), row=1, col=1)
+                
+                fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['RSI'], line=dict(color='#16A085', width=1.5), name="RSI"), row=2, col=1)
+                fig_fx.add_trace(go.Scatter(x=[df_fx.index[0], df_fx.index[-1]], y=[70, 70], line=dict(color='rgba(231, 76, 60, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
+                fig_fx.add_trace(go.Scatter(x=[df_fx.index[0], df_fx.index[-1]], y=[30, 30], line=dict(color='rgba(46, 204, 113, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
+                fig_fx.update_layout(xaxis_rangeslider_visible=False, height=650, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10))
+                st.plotly_chart(fig_fx, use_container_width=True)
+        else:
+            st.error("Küresel piyasa verileri çekilemedi. Bağlantınızı kontrol edin.")
