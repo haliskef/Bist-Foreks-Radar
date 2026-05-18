@@ -80,12 +80,10 @@ forex_assets = {
 }
 
 # =================================================================================
-# =================================================================================
-# ÇEKİRDEK 1: LAZER MODU (DÜZELTİLMİŞ VE GÜVENLİ HALE GETİRİLMİŞ SÜRÜM)
+# ÇEKİRDEK 1: LAZER MODU
 # =================================================================================
 if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
-    # JavaScript kilitlenmesini önlemek için interval'i 45 saniyeye çıkardık ve benzersiz key verdik
-    st_autorefresh(interval=45000, limit=500, key="lazer_canli_guncelleme_fixed")
+    st_autorefresh(interval=30000, limit=500, key="bist_guncelleme")
     
     with st.sidebar:
         st.markdown("### ⚙️ HİSSE PARAMETRELERİ")
@@ -94,8 +92,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         secilen_int = st.selectbox("VERİ SIKLIĞI", list(zaman_sozlugu.keys()), index=2)
         view_period = st.selectbox("GÖRÜNÜM ARALIĞI", ["1 Ay", "3 Ay", "6 Ay", "1 Yıl", "Tümü"], index=2)
 
-    # Önbellek süresini autorefresh süresiyle senkronize ettik (ttl=45)
-    @st.cache_data(ttl=45)
+    @st.cache_data(ttl=60)
     def get_full_data(kod, interval):
         try:
             ticker = yf.Ticker(kod)
@@ -105,19 +102,13 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             if data.empty: return pd.DataFrame(), {}
             if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
             data.columns = [str(c).strip().capitalize() for c in data.columns]
-            
-            # Günlük grafiklerde çökmeye sebep olan zaman dilimi hatasını düzelttik
             try:
-                if data.index.tzinfo is None:
-                    if interval != "1d": # Günlük veride localize işlemi yapılmaz
-                        data.index = data.index.tz_localize('UTC').tz_convert('Europe/Istanbul')
-                else:
-                    data.index = data.index.tz_convert('Europe/Istanbul')
+                if data.index.tzinfo is None: data.index = data.index.tz_localize('UTC').tz_convert('Europe/Istanbul')
+                else: data.index = data.index.tz_convert('Europe/Istanbul')
             except: pass
             return data, info
         except: return pd.DataFrame(), {}
 
-    # Sektör hesaplama fonksiyonu (Aynı kalıyor)
     @st.cache_data(ttl=3600)
     def otonom_sektor_hesapla(hisse_kodu):
         sektorler = {
@@ -164,10 +155,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
 
     df_all, info_data = get_full_data(hisse, zaman_sozlugu[secilen_int])
 
-    # GÜVENLİK DUVARI: Veri yoksa veya boşsa Plotly fonksiyonunu çalıştırma, arayüzü kilitleme!
-    if df_all.empty or 'Close' not in df_all.columns or len(df_all) < 5:
-        st.error("⚠️ Seçilen hisse için veri çekilemedi veya piyasa kapalı. Lütfen sayfanın kendi kendine yenilenmesini bekleyin veya hisse kodunu kontrol edin.")
-    else:
+    if not df_all.empty and 'Close' in df_all.columns:
         df = df_all.copy()
         
         # NATIVE EMA HESAPLAMALARI
@@ -257,7 +245,6 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             kanal_durumu = f"📉 HİSSE DÜŞEN TREND KANALINDA İLERLİYOR (Negatif)"
             kanal_renk = "orange"
 
-        # ALT GRAFİK PLOTLY YAPISI
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
         fig.add_trace(go.Candlestick(x=df_plot.index, open=df_plot['Open'], high=df_plot['High'], low=df_plot['Low'], close=df_plot['Close'], name="Fiyat", increasing_line_color='#00C853', increasing_fillcolor='#00C853', decreasing_line_color='#D50000', decreasing_fillcolor='#D50000'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['Ust_Trend'], name="Kanal Üst", line=dict(color='rgba(255, 152, 0, 0.8)', width=2, dash='dot')), row=1, col=1)
@@ -280,8 +267,6 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         fig.update_xaxes(rangebreaks=[dict(bounds=["sat", "mon"])], showspikes=True, spikemode="across", spikedash="dot", fixedrange=False)
         fig.update_yaxes(showspikes=True, spikemode="across", spikedash="dot", fixedrange=False)
         fig.update_layout(height=700, template="plotly_white", xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#FFFFFF', margin=dict(l=10, r=60, t=10, b=10), hovermode="x unified", dragmode="zoom")
-        
-        # GÜVENLİ ÇİZİM: Sadece veri tam doğrulanmışsa ekrana basıyoruz
         st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True})
 
         if kanal_renk == "green": st.success(kanal_durumu)
@@ -324,10 +309,13 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                 if fk_val < oto_sektor_fk: st.success(f"✅ **UCUZ:** Hissenin F/K'sı ({fk_val:.2f}), {sektor_adi} sektör ortalamasının ({oto_sektor_fk}) altında.")
                 else: st.warning(f"⚠️ **PAHALI:** Hissenin F/K'sı ({fk_val:.2f}), {sektor_adi} sektör ortalamasının ({oto_sektor_fk}) üzerinde.")
         
-        # AI PUANLAMA MOTORU
+        # =========================================================================
+        # OTONOM RAPOR METNİ VE PUANLAMA MOTORU (KUSURSUZ AKTİF)
+        # =========================================================================
         ai_puan = 0.0
         ai_rapor_maddeleri = []
 
+        # Temel Analiz Kriterleri ve Yorum Gerekçeleri
         if isinstance(fk_val, float) and fk_val > 0:
             if oto_sektor_fk and fk_val < oto_sektor_fk: 
                 ai_puan += 1.5
@@ -357,6 +345,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             ai_puan += 1.0
             ai_rapor_maddeleri.append(f"🏭 **Güçlü Operasyonel Kâr:** FAVÖK marjı %{favok_marji*100:.2f} ile ana faaliyet alanında güçlü nakit üretiyor.")
 
+        # Teknik Analiz Momentum ve Trend Yorum Gerekçeleri
         if 30 <= rsi_val <= 45: 
             ai_puan += 2.0  
             ai_rapor_maddeleri.append(f"🎯 **RSI Toplama Bölgesinde:** RSI {rsi_val:.2f} seviyesinde; aşırı alımdan uzak, dönüş için ideal güç toplama alanında.")
@@ -391,6 +380,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         ai_puan = min(10.0, max(0.0, round(ai_puan, 1))) 
         doluluk_yuzdesi = int((ai_puan / 10.0) * 100)
         
+        # Yapay Zeka Görsel Rapor Kutusu
         st.markdown("<div class='ai-score-box'>", unsafe_allow_html=True)
         st.markdown(f"<h2>🤖 YAPAY ZEKA HİBRİT KARAR MOTORU (ÖZET RAPOR)</h2>", unsafe_allow_html=True)
         st.markdown(f"<h1>{ai_puan} <span style='font-size: 1.5rem; color: #AAAAAA;'>/ 10</span></h1>", unsafe_allow_html=True)
@@ -410,12 +400,15 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         else:
             st.error("🔴 **RİSKLİ BÖLGE (UZAK DUR): Çarpanlar pahalı veya teknik göstergeler aşağı yönlü kırılım aşamasında.**")
             
+        # Dinamik Rapor Maddelerinin Ekrana Basılması
         st.markdown("#### 🔍 SİSTEM GEREKÇELERİ VE SINYAL DETAYLARI:")
         for madde in ai_rapor_maddeleri:
             st.markdown(f"<span style='color: #FFFFFF !important;'>{madde}</span>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # ANA PİYASA DURUMU VE OTONOM YORUM MOTORU
+        # ==========================================
+        # 🌍 ANA PİYASA DURUMU VE OTONOM YORUM MOTORU
+        # ==========================================
         st.markdown("---")
         st.markdown("## 🌍 ANA PİYASA DURUMU (BIST 100 & 30)")
         
@@ -426,6 +419,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
             data.columns = [str(c).strip().capitalize() for c in data.columns]
             
+            # Native Endeks İndikatör Hesaplamaları
             data['EMA21'] = data['Close'].ewm(span=21, adjust=False).mean()
             data['EMA50'] = data['Close'].ewm(span=50, adjust=False).mean()
             
@@ -445,6 +439,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             e50 = float(df_idx['EMA50'].iloc[-1])
             rsi_idx = float(df_idx['RSI'].iloc[-1])
             
+            # Trend Yapısı Algoritması
             if son_kapanis > e21 and e21 > e50:
                 trend = "🚀 GÜÇLÜ BOĞA PİYASASI: Endeks ana ortalamaların üzerinde, yükseliş trendi korunuyor."
                 renk = "green"
@@ -455,6 +450,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                 trend = "⏳ KONSOLİDASYON / KARARSIZ BÖLGE: Ortalamalar birbirine yakın, yatay seyir hakim."
                 renk = "orange"
                 
+            # Momentum / RSI Algoritması
             if rsi_idx > 70:
                 momentum = "⚠️ AŞIRI ALIM: RSI 70 üzerinde. Kısa vadeli kâr satışlarına dikkat edilmeli."
             elif rsi_idx < 30:
@@ -474,10 +470,12 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                 degisim_100 = ((son_100 - onceki_100) / onceki_100) * 100
                 st.metric("Puan", f"{son_100:.2f}", f"{degisim_100:.2f}%")
                 
+                # Mini Grafik
                 fig100 = go.Figure(go.Scatter(x=df_x100.index[-60:], y=df_x100['Close'].tail(60), line=dict(color='#1f77b4', width=3)))
                 fig100.update_layout(height=100, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis_visible=False, yaxis_visible=False)
                 st.plotly_chart(fig100, use_container_width=True)
                 
+                # Otonom Yorum Gösterimi
                 yorum_100, renk_100 = endeks_yorumla(df_x100)
                 if renk_100 == "green": st.success(yorum_100)
                 elif renk_100 == "red": st.error(yorum_100)
@@ -492,10 +490,12 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                 degisim_30 = ((son_30 - onceki_30) / onceki_30) * 100
                 st.metric("Puan", f"{son_30:.2f}", f"{degisim_30:.2f}%")
                 
+                # Mini Grafik
                 fig30 = go.Figure(go.Scatter(x=df_x030.index[-60:], y=df_x030['Close'].tail(60), line=dict(color='#9C27B0', width=3)))
                 fig30.update_layout(height=100, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis_visible=False, yaxis_visible=False)
                 st.plotly_chart(fig30, use_container_width=True)
                 
+                # Otonom Yorum Gösterimi
                 yorum_30, renk_30 = endeks_yorumla(df_x030)
                 if renk_30 == "green": st.success(yorum_30)
                 elif renk_30 == "red": st.error(yorum_30)
