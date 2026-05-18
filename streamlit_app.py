@@ -605,10 +605,11 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 # =================================================================================
 # =================================================================================
 # =================================================================================
+# =================================================================================
 # ÇEKİRDEK 3: FOREX & EMTİA & KRİPTO RADARI (PRICE ACTION & PUANLAMA ENTEGRELİ)
 # =================================================================================
 elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
-    st_autorefresh(interval=60000, limit=300, key="foreks_canli_guncelleme")
+    st_autorefresh(interval=60000, limit=300, key="foreks_canli_guncelleme_fixed_final")
     
     foreks_sembolleri = ["XAUUSD=X", "XAGUSD=X", "HG=F", "PA=F", "PL=F", "USDJPY=X", "ETH-USD"]
     symbol_names = {
@@ -635,7 +636,7 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
         df_fx = get_forex_data(sym)
         if df_fx.empty or len(df_fx) < 30: continue
         
-        # 1. MEVCUT TEKNİK HESAPLAMALAR (AYNEN KORUNDU)
+        # 1. MEVCUT TEKNİK HESAPLAMALAR
         df_fx['EMA21'] = df_fx['Close'].ewm(span=21, adjust=False).mean()
         df_fx['EMA50'] = df_fx['Close'].ewm(span=50, adjust=False).mean()
         
@@ -660,7 +661,7 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
         rsi_fx = float(df_fx['RSI'].iloc[-1])
         atr_eski = float(df_fx['ATR'].iloc[-1]) if not pd.isna(df_fx['ATR'].iloc[-1]) else son_fiyat * 0.005
 
-        # 2. GANN TAYFI VE KRİSTAL BOX MANTIĞI (YORUMA ENTEGRELİ)
+        # 2. GANN TAYFI VE KRİSTAL BOX MANTIĞI
         max_box = df_fx['High'].tail(20).max()
         min_box = df_fx['Low'].tail(20).min()
         kristal_box_sikis_yuzde = ((max_box - min_box) / min_box) * 100
@@ -670,7 +671,7 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
         y_gann = df_fx['Close'].tail(20).values
         gann_slope, _ = np.polyfit(x_gann, y_gann, 1)
 
-        # 3. YENİ: PRICE ACTION MOTORU
+        # 3. PRICE ACTION MOTORU
         son_mum = df_fx.iloc[-1]
         onceki_mum = df_fx.iloc[-2]
         
@@ -686,7 +687,7 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
         is_bullish_engulfing = (onceki_mum['Close'] < onceki_mum['Open']) and (son_mum['Close'] > son_mum['Open']) and (son_mum['Close'] > onceki_mum['Open'])
         is_bearish_engulfing = (onceki_mum['Close'] > onceki_mum['Open']) and (son_mum['Close'] < son_mum['Open']) and (son_mum['Close'] < onceki_mum['Open'])
 
-        # Market Yapısı Değişimi (MSB / CHoCH Taslağı)
+        # Market Yapısı Değişimi (MSB / CHoCH)
         son_20_zirve = df_fx['High'].tail(20).iloc[-5:].max()
         son_20_dip = df_fx['Low'].tail(20).iloc[-5:].min()
         is_msb_bullish = son_fiyat > son_20_zirve
@@ -696,21 +697,21 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
         fx_puan = 5.0  # Nötr Başlangıç
         gerekceler = []
 
-        # Esas Sinyal Mantığı (Mevcut sisteminiz korundu)
+        # Esas Sinyal Mantığı
         if son_fiyat > e21 and e21 > e50 and rsi_fx < 65:
-            strateji_yönü = "GÜÇLÜ AL (BUY)"
+            strateji_yonu = "GÜÇLÜ AL (BUY)"
             tp_noktasi = son_fiyat + (atr_eski * 2.5)
             sl_noktasi = son_fiyat - (atr_eski * 1.5)
             fx_puan += 1.5
             gerekceler.append("📈 **EMA Trendi Pozitif:** Fiyat ana ortalamaların üzerinde Boğa yönlü.")
         elif son_fiyat < e21 and e21 < e50 and rsi_fx > 35:
-            strateji_yönü = "GÜÇLÜ SAT (SELL)"
+            strateji_yonu = "GÜÇLÜ SAT (SELL)"
             tp_noktasi = son_fiyat - (atr_eski * 2.5)
             sl_noktasi = son_fiyat + (atr_eski * 1.5)
             fx_puan -= 1.5
             gerekceler.append("📉 **EMA Trendi Negatif:** Fiyat ortalamaların altında Ayı yönlü.")
         else:
-            strateji_yönü = "NÖTR (İZLE)"
+            strateji_yonu = "NÖTR (İZLE)"
             tp_noktasi, sl_noktasi = son_fiyat, son_fiyat
 
         # Kristal Box Puanlaması
@@ -719,10 +720,10 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
             gerekceler.append(f"📦 **Kristal Box Sıkışması:** Güçlü bir patlama yaklaşıyor (Daralma: %{kristal_box_sikis_yuzde:.2f})")
             
         # Gann Tayfı Puanlaması
-        if gann_slope > 0 and strateji_yönü == "GÜÇLÜ AL (BUY)":
+        if gann_slope > 0 and strateji_yonu == "GÜÇLÜ AL (BUY)":
             fx_puan += 1.0
             gerekceler.append("📐 **Gann Tayfı Destekli:** Açısal yükseliş ivmesi trendi onaylıyor.")
-        elif gann_slope < 0 and strateji_yönü == "GÜÇLÜ SAT (SELL)":
+        elif gann_slope < 0 and strateji_yonu == "GÜÇLÜ SAT (SELL)":
             fx_puan -= 1.0
             gerekceler.append("📐 **Gann Tayfı Baskısı:** Açısal düşüş ivmesi satış baskısını artırıyor.")
 
@@ -736,10 +737,10 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
             if is_bearish_pin: gerekceler.append("🎯 **Ayı Pin Bar:** Satıcılar tepeden gelen alımları güçlü reddetti.")
             if is_bearish_engulfing: gerekceler.append("🔥 **Bearish Engulfing:** Ayılar son yükseliş mumunu tamamen yuttu.")
 
-        if is_msb_bullish and strateji_yönü == "GÜÇLÜ AL (BUY)":
+        if is_msb_bullish and strateji_yonu == "GÜÇLÜ AL (BUY)":
             fx_puan += 1.0
             gerekceler.append("⚔️ **Market Yapısı (MSB):** Son lokal tepe yukarı kırıldı, yapı Boğa'ya döndü.")
-        elif is_msb_bearish and strateji_yönü == "GÜÇLÜ SAT (SELL)":
+        elif is_msb_bearish and strateji_yonu == "GÜÇLÜ SAT (SELL)":
             fx_puan -= 1.0
             gerekceler.append("⚔️ **Market Yapısı (MSB):** Son lokal dip aşağı kırıldı, yapı Ayı'ya döndü.")
 
@@ -749,7 +750,7 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
         with grid_cols[idx % 3]:
             st.markdown(f"""
             <div style="background-color: #FFFFFF; padding: 20px; border-radius: 12px; border: 2px solid #1A1A1A; margin-bottom: 25px; box-shadow: 4px 4px 0px #1A1A1A;">
-                <h3 style="margin: 0; border-bottom: 2px solid #1A1A1A; padding-bottom: 5px;">{symbol_names[sym]}</h3>
+                <h3 style="margin: 0; border-bottom: 2px solid #1A1A1A; padding-bottom: 5px; color: #111111 !important;">{symbol_names[sym]}</h3>
                 <p style="font-size: 1.5rem; margin: 10px 0; color: #111;">Fiyat: <span style="font-weight:900;">{son_fiyat:.2f}</span></p>
             </div>
             """, unsafe_allow_html=True)
@@ -763,14 +764,14 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
             </div>
             """, unsafe_allow_html=True)
 
-            if strateji_yönü == "GÜÇLÜ AL (BUY)":
-                st.success(f"🚀 {strateji_yönü}")
-            elif strateji_yönü == "GÜÇLÜ SAT (SELL)":
-                st.error(f"💥 {strateji_yönü}")
+            if strateji_yonu == "GÜÇLÜ AL (BUY)":
+                st.success(f"🚀 {strateji_yonu}")
+            elif strateji_yonu == "GÜÇLÜ SAT (SELL)":
+                st.error(f"💥 {strateji_yonu}")
             else:
-                st.warning(f"⏳ {strateji_yönü}")
+                st.warning(f"⏳ {strateji_yonu}")
 
-            # Detaylı Analiz Grafik Butonu Aktivatörü
+            # Detaylı Analiz Gerekçe Kutusu
             with st.expander("🔍 Otonom Sinyal Gerekçeleri"):
                 if kristal_box_sikis_yuzde < 1.2:
                     st.info(f"💎 **Kristal Box Durumu:** Son 20 mumda kanal genişliği %{kristal_box_sikis_yuzde:.2f} seviyesinde daraldı. Patlama yakın!")
@@ -783,7 +784,7 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
                 for g in gerekceler:
                     st.markdown(g)
                     
-                if strateji_yönü != "NÖTR (İZLE)":
+                if strateji_yonu != "NÖTR (İZLE)":
                     st.markdown(f"🎯 **Hedef (TP):** `{tp_noktasi:.2f}`")
                     st.markdown(f"🛑 **Zarar Kes (SL):** `{sl_noktasi:.2f}`")
 
@@ -794,7 +795,7 @@ elif calisma_modu == "Foreks & Emtia Radarı (Küresel Sinyal Motoru)":
             fig_fx.add_trace(go.Scatter(x=df_plot_fx.index, y=df_plot_fx['EMA21'], line=dict(color='#2ECC71', width=1.2), name="EMA 21"), row=1, col=1)
             fig_fx.add_trace(go.Scatter(x=df_plot_fx.index, y=df_plot_fx['EMA50'], line=dict(color='#3498DB', width=1.2), name="EMA 50"), row=1, col=1)
             
-            if strateji_yönü != "NÖTR (İZLE)":
+            if strateji_yonu != "NÖTR (İZLE)":
                 fig_fx.add_trace(go.Scatter(x=[df_plot_fx.index[-15], df_plot_fx.index[-1]], y=[tp_noktasi, tp_noktasi], line=dict(color='#2ECC71', width=2, dash='dash'), name="TP"), row=1, col=1)
                 fig_fx.add_trace(go.Scatter(x=[df_plot_fx.index[-15], df_plot_fx.index[-1]], y=[sl_noktasi, sl_noktasi], line=dict(color='#E74C3C', width=2, dash='dash'), name="SL"), row=1, col=1)
             
