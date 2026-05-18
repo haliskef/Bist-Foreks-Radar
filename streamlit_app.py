@@ -604,24 +604,30 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 
 # =================================================================================
 # =================================================================================
-# =================================================================================
-# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (PRICE ACTION & MAKSİMUM GENİŞ HABER SEKMELİ)
+# =================================================================================# =================================================================================
+# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (HAFIZALI SİNYAL KİLİTLEME VE ÇİFT FİYAT MODU)
 # =================================================================================
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
-    st_autorefresh(interval=60000, key="global_forex_refresh_v6_max_width")
+    st_autorefresh(interval=60000, key="global_forex_refresh_v7_state_lock")
     st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ")
     
     secilen_forex_adi = st.selectbox("Analiz Edilecek Küresel Enstrüman:", list(forex_assets.keys()))
     forex_ticker = forex_assets[secilen_forex_adi]
     
-    # SEKMELİ YARESİM (Grafik ve Haberler Ayrımı)
+    # Her enstrüman değiştiğinde hafızanın karışmaması için dinamik state anahtarları tanımlıyoruz
+    state_sinyal_key = f"fx_state_yon_{secilen_forex_adi}"
+    state_fiyat_key = f"fx_lock_price_{secilen_forex_adi}"
+    
+    if state_sinyal_key not in st.session_state: st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
+    if state_fiyat_key not in st.session_state: st.session_state[state_fiyat_key] = 0.0
+    
+    # SEKMELİ YAPI
     fx_tab1, fx_tab2 = st.tabs(["📊 Otonom Teknik Analiz & PA", "📅 Canlı Ekonomik Takvim & Makro Etki"])
     
     with fx_tab2:
         st.markdown("### 📰 Küresel Makroekonomik Takvim (Maksimum Genişlik)")
         st.warning("⚠️ **Volatilite Uyarısı:** Yüksek etkili (3 Yıldızlı / Kırmızı) verilerin açıklanma saatlerinde teknik indikatörler devredışı kalabilir. Haber saatinden 15 dk önce ve sonra işlem riskini minimuma indirin.")
         
-        # İç içe div yapısıyla Streamlit element sınırları içinde maksimum yatay yayılım sağlandı
         ekonomik_takvim_html = """
         <div style="width: 100%; padding: 0; margin: 0;">
             <div class="tradingview-widget-container" style="width: 100%; height: 850px; margin: 0 auto;">
@@ -639,7 +645,6 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             </div>
         </div>
         """
-        # iframe dikey yüksekliği 900 piksele çıkarılarak tam genişlik modu kilitlendi
         st.components.v1.html(ekonomik_takvim_html, height=900, scrolling=True)
         
     with fx_tab1:
@@ -684,9 +689,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             ema21 = float(df_fx['EMA21'].iloc[-1])
             ema50 = float(df_fx['EMA50'].iloc[-1])
             
-            sinyal_tetik_fiyati = son_fiyat
-            
-            # 3. PRICE ACTION SINIFLANDIRICI KATMANI (Pin Bar, Engulfing, MSB)
+            # 3. PRICE ACTION SINIFLANDIRICI KATMANI
             son_mum = df_fx.iloc[-1]
             onceki_mum = df_fx.iloc[-2]
             
@@ -766,24 +769,44 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             long_skor = min(10.0, round(long_skor, 1))
             short_skor = min(10.0, round(short_skor, 1))
 
+            # Geçici anlık yön tespiti
+            anlik_algoritma_yonu = "NÖTR (İZLE)"
             if long_skor >= 7.0 and long_skor >= short_skor:
-                strateji_yonu = "LONG (YUKARI)"
+                anlik_algoritma_yonu = "LONG (YUKARI)"
+            elif short_skor >= 7.0 and short_skor > long_skor:
+                anlik_algoritma_yonu = "SHORT (AŞAĞI)"
+
+            # SMART LOCK (AKILLI BELLEK KİLİTLEME) MEKANİZMASI
+            # Eğer sistem nötrden ilk defa sinyale geçtiyse, o anki tetiklenme fiyatını belleğe mühürle
+            if anlik_algoritma_yonu != "NÖTR (İZLE)" and st.session_state[state_sinyal_key] == "NÖTR (İZLE)":
+                st.session_state[state_sinyal_key] = anlik_algoritma_yonu
+                st.session_state[state_fiyat_key] = son_fiyat
+            # Eğer sistem tekrar nötre düştüyse kilidi aç ve sıfırla
+            elif anlik_algoritma_yonu == "NÖTR (İZLE)":
+                st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
+                st.session_state[state_fiyat_key] = 0.0
+
+            # Karar Atamalarını session_state verilerine göre yönetiyoruz
+            strateji_yonu = st.session_state[state_sinyal_key]
+            
+            if strateji_yonu == "LONG (YUKARI)":
                 ana_skor = long_skor
                 durum_color = "#2ECC71"
-                durum_msg = f"🚀 GÜÇLÜ BOĞA - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN İŞLEM TAVSİYESİ"
-                sl_noktasi = son_fiyat - (atr_val * 1.5)
-                tp_noktasi = son_fiyat + (atr_val * 3.0)
-            elif short_skor >= 7.0 and short_skor > long_skor:
-                strateji_yonu = "SHORT (AŞAĞI)"
+                sinyal_tetik_fiyati = st.session_state[state_fiyat_key]
+                durum_msg = f"🚀 GÜÇLÜ BOĞA - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN SİNYAL SABİTLENDİ"
+                sl_noktasi = sinyal_tetik_fiyati - (atr_val * 1.5)
+                tp_noktasi = sinyal_tetik_fiyati + (atr_val * 3.0)
+            elif strateji_yonu == "SHORT (AŞAĞI)":
                 ana_skor = short_skor
                 durum_color = "#E74C3C"
-                durum_msg = f"💥 GÜÇLÜ AYI - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN AÇIĞA SATIŞ TAVSİYESİ"
-                sl_noktasi = son_fiyat + (atr_val * 1.5)
-                tp_noktasi = son_fiyat - (atr_val * 3.0)
+                sinyal_tetik_fiyati = st.session_state[state_fiyat_key]
+                durum_msg = f"💥 GÜÇLÜ AYI - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN AÇIĞA SATIŞ SABİTLENDİ"
+                sl_noktasi = sinyal_tetik_fiyati + (atr_val * 1.5)
+                tp_noktasi = sinyal_tetik_fiyati - (atr_val * 3.0)
             else:
-                strateji_yonu = "NÖTR (İZLE)"
                 ana_skor = max(long_skor, short_skor)
                 durum_color = "#F1C40F"
+                sinyal_tetik_fiyati = son_fiyat
                 durum_msg = "🟡 TEST BÖLGESİ - BELİRLİ BİR SEVİYE KIRILIMI BEKLENİYOR"
                 sl_noktasi = son_fiyat - (atr_val * 2.0)
                 tp_noktasi = son_fiyat + (atr_val * 2.0)
@@ -796,15 +819,19 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 </div>
             """, unsafe_allow_html=True)
 
-            # METRIC SENSÖRLERİ
-            f1, f2, f3, f4 = st.columns(4)
+            # ÇİFT FİYAT DESTEKLİ METRIC SENSÖRLERİ
+            # Sinyal geldiğinde ilk kutu giriş fiyatını dondurur, ikinci kutu anlık canlı akışı gösterir.
+            f1, f2, f3, f4, f5 = st.columns(5)
             if strateji_yonu != "NÖTR (İZLE)":
-                f1.metric("🎯 SİNYAL GİRİŞ SEVİYESİ", f"{sinyal_tetik_fiyati:.4f}", help="Sinyalin algoritma tarafından onaylandığı fiyat seviyesi.")
+                f1.metric("🎯 SİNYAL GİRİŞİ (SABİT)", f"{sinyal_tetik_fiyati:.4f}", help="Kırılımın geldiği ve mühürlendiği kalıcı fiyat seviyesi.")
+                f2.metric("⚡ ANLIK FİYAT (CANLI)", f"{son_fiyat:.4f}", delta=f"{son_fiyat - sinyal_tetik_fiyati:.4f}")
             else:
                 f1.metric("ANLIK FİYAT", f"{son_fiyat:.4f}")
-            f2.metric("OYNK_ALANI (ATR)", f"{atr_val:.4f}")
-            f3.metric("🎯 OTONOM TP (KAR AL)", f"{tp_noktasi:.4f}")
-            f4.metric("🛑 OTONOM SL (ZARAR KES)", f"{sl_noktasi:.4f}")
+                f2.metric("GİRİŞ DURUMU", "BEKLEMEDE")
+                
+            f3.metric("OYNK_ALANI (ATR)", f"{atr_val:.4f}")
+            f4.metric("🎯 OTONOM TP", f"{tp_noktasi:.4f}")
+            f5.metric("🛑 OTONOM SL", f"{sl_noktasi:.4f}")
 
             # PANEL YERLEŞİMİ
             sol_p, sag_p = st.columns([1, 2])
@@ -847,7 +874,8 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 if strateji_yonu != "NÖTR (İZLE)":
                     fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[tp_noktasi, tp_noktasi], line=dict(color='#2ECC71', width=2.5), name="Hedef (TP)"), row=1, col=1)
                     fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sl_noktasi, sl_noktasi], line=dict(color='#E74C3C', width=2.5), name="Risk Sınırı (SL)"), row=1, col=1)
-                    fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sinyal_tetik_fiyati, sinyal_tetik_fiyati], line=dict(color='#111111', width=2, dash='dot'), name="Giriş Seviyesi"), row=1, col=1)
+                    # Sabitlenmiş giriş seviyesini siyah kesikli çizgi olarak grafiğe basıyoruz
+                    fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sinyal_tetik_fiyati, sinyal_tetik_fiyati], line=dict(color='#111111', width=2, dash='dot'), name="Sabit Giriş Seviyesi"), row=1, col=1)
                 
                 fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['RSI'], line=dict(color='#16A085', width=1.5), name="RSI"), row=2, col=1)
                 fig_fx.add_trace(go.Scatter(x=[df_fx.index[0], df_fx.index[-1]], y=[70, 70], line=dict(color='rgba(231, 76, 60, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
