@@ -606,22 +606,24 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 # =================================================================================
 # =================================================================================
 # =================================================================================
-# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (PRICE ACTION & GİRİŞ SEVİYESİ ENTEGRELİ)
+# =================================================================================
+# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (PRICE ACTION & HABER & SEVİYE ENTEGRELİ)
 # =================================================================================
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
-    st_autorefresh(interval=60000, key="global_forex_refresh_v4_levels")
+    st_autorefresh(interval=60000, key="global_forex_refresh_v5_final_all")
     st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ")
     
     secilen_forex_adi = st.selectbox("Analiz Edilecek Küresel Enstrüman:", list(forex_assets.keys()))
     forex_ticker = forex_assets[secilen_forex_adi]
     
+    # SEKMELİ YAPI (Geniş Ekran Takvim ve Teknik Analiz Ayrımı)
     fx_tab1, fx_tab2 = st.tabs(["📊 Otonom Teknik Analiz & PA", "📅 Canlı Ekonomik Takvim & Makro Etki"])
     
-with fx_tab2:
+    with fx_tab2:
         st.markdown("### 📰 Küresel Makroekonomik Takvim (Geniş Ekran Akışı)")
         st.warning("⚠️ **Volatilite Uyarısı:** Yüksek etkili (3 Yıldızlı / Kırmızı) verilerin açıklanma saatlerinde teknik indikatörler devredışı kalabilir. Haber saatinden 15 dk önce ve sonra işlem riskini minimuma indirin.")
         
-        # TradingView Ekonomik Takvim Widget'ı (Genişletilmiş ve Yükseltilmiş Mimari)
+        # Genişletilmiş ve Sıkışmayan TradingView Ekonomik Takvim Altyapısı
         ekonomik_takvim_html = """
         <div class="tradingview-widget-container" style="width: 100%; height: 800px; margin: 0 auto;">
           <div class="tradingview-widget-container__widget" style="width: 100%; height: 100%;"></div>
@@ -637,10 +639,7 @@ with fx_tab2:
           </script>
         </div>
         """
-        # Streamlit iframe alanını dikeyde 850 piksele çekerek alt alta olan verilerin sıkışmasını engelledik
         st.components.v1.html(ekonomik_takvim_html, height=850, scrolling=True)
-        """
-        st.components.v1.html(ekonomik_takvim_html, height=620)
         
     with fx_tab1:
         try:
@@ -684,10 +683,10 @@ with fx_tab2:
             ema21 = float(df_fx['EMA21'].iloc[-1])
             ema50 = float(df_fx['EMA50'].iloc[-1])
             
-            # Sinyal Tetiklenme Seviyesi İçin Kapanış Fiyatı
+            # Sinyal tetiklenme seviyesini anlık fiyattan mühürleme
             sinyal_tetik_fiyati = son_fiyat
             
-            # 3. PRICE ACTION SINIFLANDIRICI KATMANI
+            # 3. PRICE ACTION SINIFLANDIRICI KATMANI (Pin Bar, Engulfing, MSB)
             son_mum = df_fx.iloc[-1]
             onceki_mum = df_fx.iloc[-2]
             
@@ -695,12 +694,14 @@ with fx_tab2:
             alt_fitil = min(son_mum['Open'], son_mum['Close']) - son_mum['Low']
             ust_fitil = son_mum['High'] - max(son_mum['Open'], son_mum['Close'])
             
+            # Formasyon Kontrolleri
             is_bullish_pin = (alt_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False
             is_bearish_pin = (ust_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False
             
             is_bullish_engulfing = (onceki_mum['Close'] < onceki_mum['Open']) and (son_mum['Close'] > son_mum['Open']) and (son_mum['Close'] > onceki_mum['Open'])
             is_bearish_engulfing = (onceki_mum['Close'] > onceki_mum['Open']) and (son_mum['Close'] < son_mum['Open']) and (son_mum['Close'] < onceki_mum['Open'])
             
+            # MSB / CHoCH Yapısal Kırılımları
             son_ekstrem_zirve = df_fx['High'].tail(15).iloc[:-1].max()
             son_ekstrem_dip = df_fx['Low'].tail(15).iloc[:-1].min()
             is_msb_bullish = son_fiyat > son_ekstrem_zirve
@@ -711,6 +712,7 @@ with fx_tab2:
             short_skor = 0.0
             nedenler = []
             
+            # Kriter 1: Kristal Box
             if son_fiyat > b_ust:
                 long_skor += 3.5
                 nedenler.append("🟩 KRİSTAL BOX: Üst band yukarı yönlü kırıldı (Long +3.5)")
@@ -722,6 +724,7 @@ with fx_tab2:
                 short_skor += 0.5
                 nedenler.append("🟨 KRİSTAL BOX: Fiyat kutu içinde konsolide oluyor (Nötr +0.5)")
                 
+            # Kriter 2: Trend Dizilimi
             if son_fiyat > ema21 and ema21 > ema50:
                 long_skor += 3.0
                 nedenler.append("🟩 GANN/TREND: EMA'lar boğa diziliminde ve fiyat üstünde (Long +3.0)")
@@ -731,6 +734,7 @@ with fx_tab2:
             else:
                 nedenler.append("🟨 GANN/TREND: Hareketli ortalamalar kararsız bölgede")
                 
+            # Kriter 3: RSI / Momentum
             if 50 < rsi_val < 70:
                 long_skor += 1.5
                 nedenler.append("🟩 MOMENTUM: RSI yükseliş trendini destekliyor (Long +1.5)")
@@ -744,6 +748,7 @@ with fx_tab2:
                 long_skor += 1.0
                 nedenler.append("⚠️ MOMENTUM: Aşırı Satım! Long yönlü tepki tetiklenebilir (Long +1.0)")
 
+            # Kriter 4: Price Action Kurumsal Onaylar
             if is_bullish_pin:
                 long_skor += 1.5
                 nedenler.append("🔥 PRICE ACTION: Boğa Pin Bar (Dipten Reddedilme) oluştu (Long +1.5)")
@@ -764,9 +769,11 @@ with fx_tab2:
                 short_skor += 1.0
                 nedenler.append("⚔️ PRICE ACTION: Market Yapısı Ayı yönlü kırıldı (MSB/CHoCH) (Short +1.0)")
 
+            # Tavan skor limitleme
             long_skor = min(10.0, round(long_skor, 1))
             short_skor = min(10.0, round(short_skor, 1))
 
+            # Karar Mekanizması ve Durum Atamaları
             if long_skor >= 7.0 and long_skor >= short_skor:
                 strateji_yonu = "LONG (YUKARI)"
                 ana_skor = long_skor
@@ -789,7 +796,7 @@ with fx_tab2:
                 sl_noktasi = son_fiyat - (atr_val * 2.0)
                 tp_noktasi = son_fiyat + (atr_val * 2.0)
 
-            # Savaş Kartı Gösterimi (Dinamik Fiyat Ekli)
+            # Savaş Kartı Gösterimi
             st.markdown(f"""
                 <div style="background-color: {durum_color}; padding: 25px; border-radius: 15px; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
                     <h1 style="color: #FFFFFF !important; border: none; margin: 0; font-size: 2.2rem;">{secilen_forex_adi} // STRATEJİ: {strateji_yonu}</h1>
@@ -797,17 +804,17 @@ with fx_tab2:
                 </div>
             """, unsafe_allow_html=True)
 
-            # METRIC SENSÖRLERİ
+            # METRIC SENSÖRLERİ (Sinyal durumuna göre esnek kutu)
             f1, f2, f3, f4 = st.columns(4)
             if strateji_yonu != "NÖTR (İZLE)":
-                f1.metric("🎯 SİNYAL GİRİŞ SEVİYESİ", f"{sinyal_tetik_fiyati:.4f}", help="Sinyalin algoritma tarafından onaylandığı fiyat seviyesi.")
+                f1.metric("🎯 SİNYAL GİRİŞ SEVİYESİ", f"{sinyal_tetik_fiyati:.4f}", help="Sinyalin algoritma tarafından mühürlendiği kırılım fiyatı.")
             else:
                 f1.metric("ANLIK FİYAT", f"{son_fiyat:.4f}")
             f2.metric("OYNK_ALANI (ATR)", f"{atr_val:.4f}")
             f3.metric("🎯 OTONOM TP (KAR AL)", f"{tp_noktasi:.4f}")
             f4.metric("🛑 OTONOM SL (ZARAR KES)", f"{sl_noktasi:.4f}")
 
-            # PANEL YERLEŞİMİ
+            # PANEL YERLEŞİMİ (Sol: İlerleme Çubukları & Nedenler | Sağ: Gelişmiş Plotly)
             sol_p, sag_p = st.columns([1, 2])
             
             with sol_p:
@@ -839,21 +846,27 @@ with fx_tab2:
             with sag_p:
                 st.markdown("### 📈 Çift Yönlü Grafik ve Hedef Haritası")
                 fig_fx = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.7, 0.3])
+                
+                # Mum Grafiği
                 fig_fx.add_trace(go.Candlestick(x=df_fx.index, open=df_fx['Open'], high=df_fx['High'], low=df_fx['Low'], close=df_fx['Close'], name="Fiyat"), row=1, col=1)
+                
+                # Göstergeler
                 fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_ust'], line=dict(color='#8E44AD', width=1.5, dash='dash'), name="Box Üst Tavan"), row=1, col=1)
                 fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_alt'], line=dict(color='#8E44AD', width=1.5, dash='dash'), name="Box Alt Taban"), row=1, col=1)
                 fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA21'], line=dict(color='#E67E22', width=1.2), name="EMA 21"), row=1, col=1)
                 fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA50'], line=dict(color='#3498DB', width=1.2), name="EMA 50"), row=1, col=1)
                 
+                # Aktif İşlem Hedefleri ve Giriş Seviyesi Referans Çizgisi
                 if strateji_yonu != "NÖTR (İZLE)":
                     fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[tp_noktasi, tp_noktasi], line=dict(color='#2ECC71', width=2.5), name="Hedef (TP)"), row=1, col=1)
                     fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sl_noktasi, sl_noktasi], line=dict(color='#E74C3C', width=2.5), name="Risk Sınırı (SL)"), row=1, col=1)
-                    # Grafik üzerine sinyal giriş seviyesi çizgisi ekleme
                     fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sinyal_tetik_fiyati, sinyal_tetik_fiyati], line=dict(color='#111111', width=2, dash='dot'), name="Giriş Seviyesi"), row=1, col=1)
                 
+                # RSI Paneli
                 fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['RSI'], line=dict(color='#16A085', width=1.5), name="RSI"), row=2, col=1)
                 fig_fx.add_trace(go.Scatter(x=[df_fx.index[0], df_fx.index[-1]], y=[70, 70], line=dict(color='rgba(231, 76, 60, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
                 fig_fx.add_trace(go.Scatter(x=[df_fx.index[0], df_fx.index[-1]], y=[30, 30], line=dict(color='rgba(46, 204, 113, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
+                
                 fig_fx.update_layout(xaxis_rangeslider_visible=False, height=650, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10))
                 st.plotly_chart(fig_fx, use_container_width=True)
         else:
