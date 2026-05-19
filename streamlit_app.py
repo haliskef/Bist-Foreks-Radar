@@ -604,33 +604,57 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 
 # =================================================================================
 # =================================================================================
-# =================================================================================# =================================================================================
-# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (HAFIZALI SİNYAL KİLİTLEME VE ÇİFT FİYAT MODU)
+# =================================================================================#
+# =================================================================================
+# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (HAFIZALI KİLİT, TELEGRAM VE MAKS GENİŞ TÜRKÇE HABER)
 # =================================================================================
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
-    st_autorefresh(interval=60000, key="global_forex_refresh_v7_state_lock")
+    st_autorefresh(interval=60000, key="global_forex_refresh_v9_final_all_in_one")
     st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ")
     
+    # -----------------------------------------------------------------------------
+    # TELEGRAM ENTEGRASYON BÖLÜMÜ
+    # BotFather'dan aldığın Token'ı ve userinfobot'tan aldığın Chat ID'yi buraya girebilirsin.
+    # -----------------------------------------------------------------------------
+    TELEGRAM_BOT_TOKEN = "8817119197:AAHcHADLXZ7DbLgJp7yskg94QO0Q6jJd85s"
+    TELEGRAM_CHAT_ID = "1338802399"
+
+    def telegram_sinyal_gonder(mesaj):
+        """Kırılım anında Telegram üzerinden anlık bildirim atar."""
+        if TELEGRAM_BOT_TOKEN != "8817119197:AAHcHADLXZ7DbLgJp7yskg94QO0Q6jJd85s" and TELEGRAM_CHAT_ID != "1338802399":
+            try:
+                import requests
+                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+                payload = {"chat_id": TELEGRAM_CHAT_ID, "text": mesaj, "parse_mode": "Markdown"}
+                requests.post(url, json=payload, timeout=5)
+            except Exception as e:
+                pass # Ana sistemin çalışmasını aksatmamak için hataları sessizce geçiyoruz
+
     secilen_forex_adi = st.selectbox("Analiz Edilecek Küresel Enstrüman:", list(forex_assets.keys()))
     forex_ticker = forex_assets[secilen_forex_adi]
     
-    # Her enstrüman değiştiğinde hafızanın karışmaması için dinamik state anahtarları tanımlıyoruz
+    # Her enstrüman için bağımsız hafıza alanı kilitliyoruz
     state_sinyal_key = f"fx_state_yon_{secilen_forex_adi}"
     state_fiyat_key = f"fx_lock_price_{secilen_forex_adi}"
     
     if state_sinyal_key not in st.session_state: st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
     if state_fiyat_key not in st.session_state: st.session_state[state_fiyat_key] = 0.0
     
-    # SEKMELİ YAPI
+    # SEKMELİ YAPI (Grafik Paneli ve Geniş Haber Paneli Ayrımı)
     fx_tab1, fx_tab2 = st.tabs(["📊 Otonom Teknik Analiz & PA", "📅 Canlı Ekonomik Takvim & Makro Etki"])
     
     with fx_tab2:
-        st.markdown("### 📰 Küresel Makroekonomik Takvim (Maksimum Genişlik)")
+        st.markdown("### 📰 Küresel Makroekonomik Takvim (Maksimum Genişlik & Türkçe)")
         st.warning("⚠️ **Volatilite Uyarısı:** Yüksek etkili (3 Yıldızlı / Kırmızı) verilerin açıklanma saatlerinde teknik indikatörler devredışı kalabilir. Haber saatinden 15 dk önce ve sonra işlem riskini minimuma indirin.")
         
+        # HTML/CSS ile Streamlit şablon boşluklarını sıfırlayarak tam ekran genişliği sağlıyoruz
         ekonomik_takvim_html = """
-        <div style="width: 100%; padding: 0; margin: 0;">
-            <div class="tradingview-widget-container" style="width: 100%; height: 850px; margin: 0 auto;">
+        <div style="position: relative; width: 100%; margin: 0; padding: 0;">
+            <style>
+                html, body { margin: 0; padding: 0; overflow-x: hidden; }
+                .tradingview-widget-container { width: 100% !important; height: 900px !important; }
+            </style>
+            <div class="tradingview-widget-container">
               <div class="tradingview-widget-container__widget" style="width: 100%; height: 100%;"></div>
               <script type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
               {
@@ -639,13 +663,14 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
               "width": "100%",
               "height": "100%",
               "locale": "tr",
-              "importanceFilter": "-1,0,1"
+              "importanceFilter": "-1,0,1",
+              "countryFilter": "us,eu,gb,jp,ch,ca,au,tr"
               }
               </script>
             </div>
         </div>
         """
-        st.components.v1.html(ekonomik_takvim_html, height=900, scrolling=True)
+        st.components.v1.html(ekonomik_takvim_html, height=950, scrolling=True)
         
     with fx_tab1:
         try:
@@ -699,7 +724,6 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             
             is_bullish_pin = (alt_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False
             is_bearish_pin = (ust_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False
-            
             is_bullish_engulfing = (onceki_mum['Close'] < onceki_mum['Open']) and (son_mum['Close'] > son_mum['Open']) and (son_mum['Close'] > onceki_mum['Open'])
             is_bearish_engulfing = (onceki_mum['Close'] > onceki_mum['Open']) and (son_mum['Close'] < son_mum['Open']) and (son_mum['Close'] < onceki_mum['Open'])
             
@@ -708,7 +732,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             is_msb_bullish = son_fiyat > son_ekstrem_zirve
             is_msb_bearish = son_fiyat < son_ekstrem_dip
 
-            # 4. ÇİFT YÖNLÜ KARAR & PUANLAMA MOTORU
+            # 4. ÇİFT YÖNLÜ KARAR MOTORU
             long_skor = 0.0
             short_skor = 0.0
             nedenler = []
@@ -720,8 +744,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 short_skor += 3.5
                 nedenler.append("🟥 KRİSTAL BOX: Alt band aşağı yönlü kırıldı (Short +3.5)")
             else:
-                long_skor += 0.5
-                short_skor += 0.5
+                long_skor += 0.5; short_skor += 0.5
                 nedenler.append("🟨 KRİSTAL BOX: Fiyat kutu içinde konsolide oluyor (Nötr +0.5)")
                 
             if son_fiyat > ema21 and ema21 > ema50:
@@ -733,38 +756,18 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             else:
                 nedenler.append("🟨 GANN/TREND: Hareketli ortalamalar kararsız bölgede")
                 
-            if 50 < rsi_val < 70:
-                long_skor += 1.5
-                nedenler.append("🟩 MOMENTUM: RSI yükseliş trendini destekliyor (Long +1.5)")
-            elif 30 < rsi_val <= 50:
-                short_skor += 1.5
-                nedenler.append("🟥 MOMENTUM: RSI düşüş eğilimini destekliyor (Short +1.5)")
-            elif rsi_val >= 70:
-                short_skor += 1.0
-                nedenler.append("⚠️ MOMENTUM: Aşırı Alım! Short yönlü dönüş tetiklenebilir (Short +1.0)")
-            elif rsi_val <= 30:
-                long_skor += 1.0
-                nedenler.append("⚠️ MOMENTUM: Aşırı Satım! Long yönlü tepki tetiklenebilir (Long +1.0)")
+            if 50 < rsi_val < 70: long_skor += 1.5
+            elif 30 < rsi_val <= 50: short_skor += 1.5
+            elif rsi_val >= 70: short_skor += 1.0
+            elif rsi_val <= 30: long_skor += 1.0
 
-            if is_bullish_pin:
-                long_skor += 1.5
-                nedenler.append("🔥 PRICE ACTION: Boğa Pin Bar (Dipten Reddedilme) oluştu (Long +1.5)")
-            if is_bullish_engulfing:
-                long_skor += 1.5
-                nedenler.append("🔥 PRICE ACTION: Bullish Engulfing (Yutan Boğa Mumu) görüldü (Long +1.5)")
-            if is_msb_bullish:
-                long_skor += 1.0
-                nedenler.append("⚔️ PRICE ACTION: Market Yapısı Boğa yönlü kırıldı (MSB/CHoCH) (Long +1.0)")
+            if is_bullish_pin: long_skor += 1.5; nedenler.append("🔥 PRICE ACTION: Boğa Pin Bar oluştu")
+            if is_bullish_engulfing: long_skor += 1.5; nedenler.append("🔥 PRICE ACTION: Bullish Engulfing görüldü")
+            if is_msb_bullish: long_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Boğa yönlü kırıldı (MSB/CHoCH)")
                 
-            if is_bearish_pin:
-                short_skor += 1.5
-                nedenler.append("❄️ PRICE ACTION: Ayı Pin Bar (Tepeden Reddedilme) oluştu (Short +1.5)")
-            if is_bearish_engulfing:
-                short_skor += 1.5
-                nedenler.append("❄️ PRICE ACTION: Bearish Engulfing (Yutan Ayı Mumu) görüldü (Short +1.5)")
-            if is_msb_bearish:
-                short_skor += 1.0
-                nedenler.append("⚔️ PRICE ACTION: Market Yapısı Ayı yönlü kırıldı (MSB/CHoCH) (Short +1.0)")
+            if is_bearish_pin: short_skor += 1.5; nedenler.append("❄️ PRICE ACTION: Ayı Pin Bar oluştu")
+            if is_bearish_engulfing: short_skor += 1.5; nedenler.append("❄️ PRICE ACTION: Bearish Engulfing görüldü")
+            if is_msb_bearish: short_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Ayı yönlü kırıldı (MSB/CHoCH)")
 
             long_skor = min(10.0, round(long_skor, 1))
             short_skor = min(10.0, round(short_skor, 1))
@@ -776,40 +779,47 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             elif short_skor >= 7.0 and short_skor > long_skor:
                 anlik_algoritma_yonu = "SHORT (AŞAĞI)"
 
-            # SMART LOCK (AKILLI BELLEK KİLİTLEME) MEKANİZMASI
-            # Eğer sistem nötrden ilk defa sinyale geçtiyse, o anki tetiklenme fiyatını belleğe mühürle
+            # AKILLI BELLEK KİLİTLEME & TELEGRAM ANLIK TETİKLEME MEKANİZMASI
             if anlik_algoritma_yonu != "NÖTR (İZLE)" and st.session_state[state_sinyal_key] == "NÖTR (İZLE)":
                 st.session_state[state_sinyal_key] = anlik_algoritma_yonu
                 st.session_state[state_fiyat_key] = son_fiyat
-            # Eğer sistem tekrar nötre düştüyse kilidi aç ve sıfırla
+                
+                # Sinyal ilk kilitlendiği an gidecek Telegram Mesaj Şablonu
+                hedef_tp = son_fiyat + (atr_val * 3.0) if anlik_algoritma_yonu == "LONG (YUKARI)" else son_fiyat - (atr_val * 3.0)
+                risk_sl = son_fiyat - (atr_val * 1.5) if anlik_algoritma_yonu == "LONG (YUKARI)" else son_fiyat + (atr_val * 1.5)
+                skor_val = long_skor if anlik_algoritma_yonu == "LONG (YUKARI)" else short_skor
+                emoji = "🚀" if anlik_algoritma_yonu == "LONG (YUKARI)" else "💥"
+                
+                mesaj_metni = (
+                    f"{emoji} *OTONOM KIRILIM ALERJİSİ*\n\n"
+                    f"**Enstrüman:** {secilen_forex_adi}\n"
+                    f"**Strateji Yönü:** {anlik_algoritma_yonu}\n"
+                    f"**Giriş Seviyesi:** `{son_fiyat:.4f}`\n"
+                    f"**Hedef (TP):** `{hedef_tp:.4f}`\n"
+                    f"**Zarar Kes (SL):** `{risk_sl:.4f}`\n"
+                    f"**Sistem Güven Skoru:** `{skor_val}/10`"
+                )
+                telegram_sinyal_gonder(mesaj_metni)
+                
             elif anlik_algoritma_yonu == "NÖTR (İZLE)":
                 st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
                 st.session_state[state_fiyat_key] = 0.0
 
-            # Karar Atamalarını session_state verilerine göre yönetiyoruz
+            # Durum Atamalarını session_state hafıza verilerine göre yapılandırıyoruz
             strateji_yonu = st.session_state[state_sinyal_key]
             
             if strateji_yonu == "LONG (YUKARI)":
-                ana_skor = long_skor
-                durum_color = "#2ECC71"
-                sinyal_tetik_fiyati = st.session_state[state_fiyat_key]
+                ana_skor = long_skor; durum_color = "#2ECC71"; sinyal_tetik_fiyati = st.session_state[state_fiyat_key]
                 durum_msg = f"🚀 GÜÇLÜ BOĞA - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN SİNYAL SABİTLENDİ"
-                sl_noktasi = sinyal_tetik_fiyati - (atr_val * 1.5)
-                tp_noktasi = sinyal_tetik_fiyati + (atr_val * 3.0)
+                sl_noktasi = sinyal_tetik_fiyati - (atr_val * 1.5); tp_noktasi = sinyal_tetik_fiyati + (atr_val * 3.0)
             elif strateji_yonu == "SHORT (AŞAĞI)":
-                ana_skor = short_skor
-                durum_color = "#E74C3C"
-                sinyal_tetik_fiyati = st.session_state[state_fiyat_key]
+                ana_skor = short_skor; durum_color = "#E74C3C"; sinyal_tetik_fiyati = st.session_state[state_fiyat_key]
                 durum_msg = f"💥 GÜÇLÜ AYI - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN AÇIĞA SATIŞ SABİTLENDİ"
-                sl_noktasi = sinyal_tetik_fiyati + (atr_val * 1.5)
-                tp_noktasi = sinyal_tetik_fiyati - (atr_val * 3.0)
+                sl_noktasi = sinyal_tetik_fiyati + (atr_val * 1.5); tp_noktasi = sinyal_tetik_fiyati - (atr_val * 3.0)
             else:
-                ana_skor = max(long_skor, short_skor)
-                durum_color = "#F1C40F"
-                sinyal_tetik_fiyati = son_fiyat
+                ana_skor = max(long_skor, short_skor); durum_color = "#F1C40F"; sinyal_tetik_fiyati = son_fiyat
                 durum_msg = "🟡 TEST BÖLGESİ - BELİRLİ BİR SEVİYE KIRILIMI BEKLENİYOR"
-                sl_noktasi = son_fiyat - (atr_val * 2.0)
-                tp_noktasi = son_fiyat + (atr_val * 2.0)
+                sl_noktasi = son_fiyat - (atr_val * 2.0); tp_noktasi = son_fiyat + (atr_val * 2.0)
 
             # Savaş Kartı Gösterimi
             st.markdown(f"""
@@ -819,12 +829,11 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 </div>
             """, unsafe_allow_html=True)
 
-            # ÇİFT FİYAT DESTEKLİ METRIC SENSÖRLERİ
-            # Sinyal geldiğinde ilk kutu giriş fiyatını dondurur, ikinci kutu anlık canlı akışı gösterir.
+            # ÇİFT FİYAT DESTEKLİ METRIC SENSÖRLERİ (Sabit Giriş vs Anlık Canlı Takip)
             f1, f2, f3, f4, f5 = st.columns(5)
             if strateji_yonu != "NÖTR (İZLE)":
-                f1.metric("🎯 SİNYAL GİRİŞİ (SABİT)", f"{sinyal_tetik_fiyati:.4f}", help="Kırılımın geldiği ve mühürlendiği kalıcı fiyat seviyesi.")
-                f2.metric("⚡ ANLIK FİYAT (CANLI)", f"{son_fiyat:.4f}", delta=f"{son_fiyat - sinyal_tetik_fiyati:.4f}")
+                f1.metric("🎯 SİNYAL GİRİŞİ (SABİT)", f"{sinyal_tetik_fiyati:.4f}", help="Kırılımın geldiği ve dondurulduğu kalıcı fiyat seviyesi.")
+                f2.metric("⚡ ANLIK FİYAT (CANLI)", f"{son_fiyat:.4f}", delta=f"{son_fiyat - sinyal_tetik_fiyati:.4f}", help="Canlı akan fiyat ve girişten uzaklığı.")
             else:
                 f1.metric("ANLIK FİYAT", f"{son_fiyat:.4f}")
                 f2.metric("GİRİŞ DURUMU", "BEKLEMEDE")
@@ -833,12 +842,11 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             f4.metric("🎯 OTONOM TP", f"{tp_noktasi:.4f}")
             f5.metric("🛑 OTONOM SL", f"{sl_noktasi:.4f}")
 
-            # PANEL YERLEŞİMİ
+            # PANEL YERLEŞİMİ (Sol: İstatistikler | Sağ: Gelişmiş Plotly)
             sol_p, sag_p = st.columns([1, 2])
             
             with sol_p:
                 st.markdown("### 🧠 Çift Yönlü Sistem Ortalaması")
-                
                 st.markdown(f"**🟢 Long Algoritma Ağırlığı:** `{long_skor} / 10`")
                 st.markdown(f"""
                 <div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 12px;">
@@ -854,8 +862,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 """, unsafe_allow_html=True)
                 
                 st.markdown("#### 🔍 Sinyal Gerekçeleri")
-                for neden in nedenler:
-                    st.write(f"- {neden}")
+                for neden in nedenler: st.write(f"- {neden}")
                     
                 st.markdown("#### 🔬 Teknik Değerler")
                 st.write(f"**RSI Göstergesi:** {rsi_val:.2f}")
@@ -874,12 +881,9 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 if strateji_yonu != "NÖTR (İZLE)":
                     fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[tp_noktasi, tp_noktasi], line=dict(color='#2ECC71', width=2.5), name="Hedef (TP)"), row=1, col=1)
                     fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sl_noktasi, sl_noktasi], line=dict(color='#E74C3C', width=2.5), name="Risk Sınırı (SL)"), row=1, col=1)
-                    # Sabitlenmiş giriş seviyesini siyah kesikli çizgi olarak grafiğe basıyoruz
                     fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sinyal_tetik_fiyati, sinyal_tetik_fiyati], line=dict(color='#111111', width=2, dash='dot'), name="Sabit Giriş Seviyesi"), row=1, col=1)
                 
                 fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['RSI'], line=dict(color='#16A085', width=1.5), name="RSI"), row=2, col=1)
-                fig_fx.add_trace(go.Scatter(x=[df_fx.index[0], df_fx.index[-1]], y=[70, 70], line=dict(color='rgba(231, 76, 60, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
-                fig_fx.add_trace(go.Scatter(x=[df_fx.index[0], df_fx.index[-1]], y=[30, 30], line=dict(color='rgba(46, 204, 113, 0.5)', width=1, dash='dot'), showlegend=False), row=2, col=1)
                 fig_fx.update_layout(xaxis_rangeslider_visible=False, height=650, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10))
                 st.plotly_chart(fig_fx, use_container_width=True)
         else:
