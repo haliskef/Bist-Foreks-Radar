@@ -64,19 +64,19 @@ with st.sidebar:
 forex_assets = {
     "ONS ALTIN": "GC=F",
     "ONS GÜMÜŞ": "SI=F",
+    "ONS BAKIR" : "HG=F",
+    "ONS PALADYUM": "PA=F",
+    "ONS PLATİN": "PL=F",
     "BRENT PETROL": "BZ=F",
     "EUR/USD": "EURUSD=X",
     "GBP/USD": "GBPUSD=X",
-    "BTC/USD": "BTC-USD",
+    "USD/JPY": "USDJPY=X",
     "S&P 500": "^GSPC",
     "NASDAQ 100": "^NDX",
     "DXY (Dolar Endeksi)": "DX-Y.NYB",
     "DAX 40 (Almanya)": "^GDAXI",
-    "ONS BAKIR" : "HG=F",
-    "ONS PALADYUM": "PA=F",
-    "USD/JPY": "USDJPY=X",
     "ETH/USD": "ETH-USD",
-    "ONS PLATİN": "PL=F"
+    "BTC/USD": "BTC-USD"
 }
 
 # =================================================================================
