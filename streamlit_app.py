@@ -674,9 +674,9 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
         
     with fx_tab1:
         with fx_tab1:
-        # 🔔 GEÇİCİ TELEGRAM TEST BUTONU (Mesajı aldıktan sonra bu 3 satırı silebilirsin)
-        if st.button("🚀 Sistem Bildirim Testini Tetikle"):
-            telegram_sinyal_gonder("🎯 *SİSTEM TESTİ BAŞARILI!*\n\nStreamlit uygulaması şu anda Telegram botuna doğrudan bağlı ve otonom sinyal göndermeye hazır.")
+            # 🔔 GEÇİCİ TELEGRAM TEST BUTONU (Mesajı aldıktan sonra bu 3 satırı silebilirsin)
+            if st.button("🚀 Sistem Bildirim Testini Tetikle"):
+                telegram_sinyal_gonder("🎯 *SİSTEM TESTİ BAŞARILI!*\n\nStreamlit uygulaması şu anda Telegram botuna doğrudan bağlı ve otonom sinyal göndermeye hazır.")
         try:
             df_fx = yf.download(tickers=forex_ticker, period="1mo", interval="1h", progress=False)
         except:
