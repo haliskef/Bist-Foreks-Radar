@@ -340,19 +340,22 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         son_fiyat = df['Close'].iloc[-1].item()
         rsi_val = df['RSI'].iloc[-1].item()
 
+        # 🛡️ PİYASA KAPALI/AÇIK HATASIZ DEĞİŞİM VE AÇILIŞ HESAPLAYICI
         try:
-            bugun = df_all.index[-1].date()
-            gun_verisi = df_all[df_all.index.date == bugun]
-            gun_acilisi = gun_verisi['Open'].iloc[0].item()
-            onceki_gunler = df_all[df_all.index.date < bugun]
-            if not onceki_gunler.empty:
-                onceki_kapanis = onceki_gunler['Close'].iloc[-1].item()
+            # Kaçıncı satırda olduğumuza bakmaksızın en son kapanış ve açılış verisi
+            gun_acilisi = df_all['Open'].iloc[-1].item()
+            
+            # Eğer elimizde en az 2 satır varsa bir önceki kapanışa göre yüzdeyi hesapla
+            if len(df_all) > 1:
+                onceki_kapanis = df_all['Close'].iloc[-2].item()
                 gunluk_yuzde = ((son_fiyat - onceki_kapanis) / onceki_kapanis) * 100
                 delta_str = f"{gunluk_yuzde:.2f}%"
-            else: delta_str = None
-        except:
-            gun_acilisi = df_all['Open'].iloc[-1].item()
-            delta_str = None
+            else:
+                delta_str = "0.00%"
+        except Exception as e:
+            gun_acilisi = son_fiyat
+            delta_str = "0.00%"
+
 
         max_price = df_plot['High'].max()
         min_price = df_plot['Low'].min()
