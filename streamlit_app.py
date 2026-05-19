@@ -83,31 +83,12 @@ forex_assets = {
 # =================================================================================
 # =================================================================================
 # =================================================================================
-# ÇEKİRDEK 1: LAZER MODU (BIST 100 / BIST 30 ENDEKS KORUMALI & PİYASA KAPALI SÜRÜMÜ)
+# ÇEKİRDEK 1: LAZER MODU (ORİJİNAL YAPI KORUNARAK ARKA PLAN MOTORU ENTEGRE EDİLDİ)
 # =================================================================================
 if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
+    # JavaScript kilitlenmesini önlemek için interval'i 45 saniyeye çıkardık ve benzersiz key verdik
+    st_autorefresh(interval=45000, limit=500, key="lazer_canli_guncelleme_fixed")
     
-    # -----------------------------------------------------------------------------
-    # ⏰ PİYASA SAATLERİ KONTROLÜ (Piyasa Kapalıyken Sayfa Yenilemeyi Kapatır)
-    # -----------------------------------------------------------------------------
-    import datetime
-    
-    simdi = datetime.datetime.now()
-    gun_bist = simdi.weekday() # 0=Pazartesi, ..., 5=Cumartesi, 6=Pazar
-    saat_dakika_bist = simdi.hour * 100 + simdi.minute
-
-    piyasa_acik_mi = True
-    if gun_bist >= 5: # Hafta sonu
-        piyasa_acik_mi = False
-    elif saat_dakika_bist < 955 or saat_dakika_bist > 1830: # Seans dışı saatler
-        piyasa_acik_mi = False
-
-    # Piyasa açıksa 45 saniyede bir otomatik yenile, kapalıysa uykuya al (ekran donmasın)
-    if piyasa_acik_mi:
-        st_autorefresh(interval=45000, limit=500, key="lazer_canli_guncelleme_fixed")
-    else:
-        st.caption("🌙 Piyasa kapalı olduğu için otonom ekran yenileme uyku moduna alındı. Sakin kafayla manuel inceleme yapabilirsiniz.")
-
     # Zaman ve Arka plan iş parçacığı kütüphanelerini dahil ediyoruz
     import time
     import threading
@@ -141,7 +122,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                 pass
 
     # -----------------------------------------------------------------------------
-    # 🛰️ OTONOM ARKA PLAN RADAR MOTORU
+    # 🛰️ OTONOM ARKA PLAN RADAR MOTORU (SENİN KODUNU KİLİTLEMEYEN GİZLİ İŞÇİ)
     # -----------------------------------------------------------------------------
     bist100_otonom_liste = [
         "AEFES.IS", "AGHOL.IS", "AKBNK.IS", "AKCNS.IS", "AKFGY.IS", "AKSA.IS", "AKSEN.IS", "ALARK.IS", "ALBRK.IS", 
@@ -161,18 +142,21 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
     if "otonom_radar_aktif" not in st.session_state:
         st.session_state.otonom_radar_aktif = False
     if "otonom_son_gonderilenler" not in st.session_state:
-        st.session_state.otonom_son_gonderilenler = {}
+        st.session_state.otonom_son_gonderilenler = {} # Hisse -> Son gönderim zamanı
 
     def saf_arka_plan_tarayici():
+        """ Arayüzden bağımsız, BIST 100 listesini sürekli dönen izole fonksiyon """
         while True:
             for o_kod in bist100_otonom_liste:
                 try:
+                    # Yahoo Finance ban atmaması için kontrollü veri çekimi
                     ticker_o = yf.Ticker(o_kod)
                     df_o = ticker_o.history(period="1mo", interval="1d")
                     if df_o.empty or len(df_o) < 5: continue
                     if isinstance(df_o.columns, pd.MultiIndex): df_o.columns = df_o.columns.get_level_values(0)
                     df_o.columns = [str(c).strip().capitalize() for c in df_o.columns]
 
+                    # Gösterge Hesapları (Senin orijinal mantığınla)
                     df_o['EMA50'] = df_o['Close'].ewm(span=50, adjust=False).mean()
                     delta_o = df_o['Close'].diff()
                     gain_o = delta_o.clip(lower=0)
@@ -186,6 +170,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                     roe_o = info_o.get('returnOnEquity', None)
                     favok_o = info_o.get('ebitdaMargins', None)
 
+                    # SENİN AI MOTORUNUN AYNI PUANLAMA MANTIĞI
                     o_puan = 0.0
                     o_maddeler = []
 
@@ -207,36 +192,38 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                     o_puan = min(10.0, max(0.0, round(o_puan, 1)))
                     hisse_temiz = o_kod.replace('.IS', '')
 
+                    # 🌟 FİLTRE: Puan 7.0 veya üzerindeyse ve son 1 saat içinde gönderilmediyse Telegram'a at
                     if o_puan >= 7.0:
-                        simdi_t = time.time()
+                        simdi = time.time()
                         son_atim_zamani = st.session_state.otonom_son_gonderilenler.get(hisse_temiz, 0.0)
                         
-                        if (simdi_t - son_atim_zamani) > 3600.0:
-                            st.session_state.otonom_son_gonderilenler[hisse_temiz] = simdi_t
+                        if (simdi - son_atim_zamani) > 3600.0: # 1 saatlik spambot koruması
+                            st.session_state.otonom_son_gonderilenler[hisse_temiz] = simdi
                             gerekce_metni = "\n".join(o_maddeler)
                             
                             radar_mesaj = (
                                 f"🛰️ *BIST 100 OTONOM RADAR SİNYALİ*\n\n"
                                 f"**Hisse:** #{hisse_temiz}\n"
                                 f"**Anlık Fiyat:** `{fiyat_o:.2f} TL`\n"
-                                f"**Yapar Zeka Skoru:** `{o_puan} / 10` 🔥\n\n"
+                                f"**Yapar Zeka Skoru:** `{o_puan} / 10` 🔥 *(ŞAMPİYON BARAJI GİRİŞ)*\n\n"
                                 f"**🔍 Tespit Edilen Güçlü Gerekçeler:**\n{gerekce_metni}\n\n"
                                 f"🤖 _Siz panelle oynarken arka plan motoru tarayıp otomatik gönderdi._"
                             )
                             telegram_bist_sinyal_gonder(radar_mesaj)
                     
-                    time.sleep(3.5)
+                    time.sleep(3.5) # Yahoo Finance'tan ban yememek için hisseler arası güvenli bekleme
                 except:
                     time.sleep(2)
-            time.sleep(10)
+            time.sleep(10) # Liste komple bittiğinde başa dönmeden önce kısa bir nefes al
 
+    # Arka plan thread'ini tek bir kez ayağa kaldırıyoruz (Arayüz kopyalanmasını engeller)
     if not st.session_state.otonom_radar_aktif:
         t = threading.Thread(target=saf_arka_plan_tarayici, daemon=True)
         t.start()
         st.session_state.otonom_radar_aktif = True
 
     # -----------------------------------------------------------------------------
-    # VERİ YÜKLEME VE KORUMA SİSTEMİ (YAHOO BAN ENGELEYİCİ İNATÇI SÜRÜM)
+    # SİZİN MANUEL EKRAN KİLİTLERİNİZ VE ORİJİNAL AKIŞIN DEVAMI
     # -----------------------------------------------------------------------------
     state_sinyal_key = f"bist_hybrid_state_{hisse}"
     state_fiyat_key = f"bist_hybrid_price_{hisse}"
@@ -248,36 +235,27 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         
     @st.cache_data(ttl=45)
     def get_full_data(kod, interval):
-        p = "2y" if interval in ["1h", "1d"] else "1mo"
-        for deneme in range(3):
-            try:
-                ticker = yf.Ticker(kod)
-                data = ticker.history(period=p, interval=interval, timeout=10)
-                info = ticker.info
-                if not data.empty:
-                    if isinstance(data.columns, pd.MultiIndex): 
-                        data.columns = data.columns.get_level_values(0)
-                    data.columns = [str(c).strip().capitalize() for c in data.columns]
-                    try:
-                        if data.index.tzinfo is None:
-                            if interval != "1d":
-                                data.index = data.index.tz_localize('UTC').tz_convert('Europe/Istanbul')
-                        else:
-                            data.index = data.index.tz_convert('Europe/Istanbul')
-                    except: pass
-                    return data, info
-            except:
-                time.sleep(1)
-                continue
         try:
-            data = yf.download(kod, period=p, interval=interval, progress=False, timeout=10)
-            if not data.empty:
-                if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
-                data.columns = [str(c).strip().capitalize() for c in data.columns]
-                return data, {}
-        except: pass
-        return pd.DataFrame(), {}
+            ticker = yf.Ticker(kod)
+            p = "2y" if interval in ["1h", "1d"] else "1mo"
+            data = ticker.history(period=p, interval=interval)
+            info = ticker.info
+            if data.empty: return pd.DataFrame(), {}
+            if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
+            data.columns = [str(c).strip().capitalize() for c in data.columns]
+            
+            # Günlük grafiklerde çökmeye sebep olan zaman dilimi hatasını düzelttik
+            try:
+                if data.index.tzinfo is None:
+                    if interval != "1d": # Günlük veride localize işlemi yapılmaz
+                        data.index = data.index.tz_localize('UTC').tz_convert('Europe/Istanbul')
+                else:
+                    data.index = data.index.tz_convert('Europe/Istanbul')
+            except: pass
+            return data, info
+        except: return pd.DataFrame(), {}
 
+    # Sektör hesaplama fonksiyonu (Aynı kalıyor)
     @st.cache_data(ttl=3600)
     def otonom_sektor_hesapla(hisse_kodu):
         sektorler = {
@@ -324,23 +302,29 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
 
     df_all, info_data = get_full_data(hisse, zaman_sozlugu[secilen_int])
 
+    # GÜVENLİK DUVARI: Veri yoksa veya boşsa Plotly fonksiyonunu çalıştırma, arayüzü kilitleme!
     if df_all.empty or 'Close' not in df_all.columns or len(df_all) < 5:
-        st.error("⚠️ Seçilen hisse için veri çekilemedi. Kodun doğruluğundan eminseniz Yahoo Finance sunucuları geçici yanıt vermiyor olabilir.")
+        st.error("⚠️ Seçilen hisse için veri çekilemedi veya piyasa kapalı. Lütfen sayfanın kendi kendine yenilenmesini bekleyin veya hisse kodunu kontrol edin.")
     else:
         df = df_all.copy()
         
-        # GÖSTERGELER
+        # NATIVE EMA HESAPLAMALARI
         df['EMA7'] = df['Close'].ewm(span=7, adjust=False).mean()
         df['EMA21'] = df['Close'].ewm(span=21, adjust=False).mean()
         df['EMA50'] = df['Close'].ewm(span=50, adjust=False).mean()
         df['EMA100'] = df['Close'].ewm(span=100, adjust=False).mean()
         df['EMA200'] = df['Close'].ewm(span=200, adjust=False).mean()
         
+        # NATIVE RSI HESAPLAMASI
         delta = df['Close'].diff()
         gain = delta.clip(lower=0)
         loss = -delta.clip(upper=0)
-        df['RSI'] = 100 - (100 / (1 + (gain.ewm(com=13, adjust=False).mean() / loss.ewm(com=13, adjust=False).mean())))
+        avg_gain = gain.ewm(com=13, adjust=False).mean()
+        avg_loss = loss.ewm(com=13, adjust=False).mean()
+        rs = avg_gain / avg_loss
+        df['RSI'] = 100 - (100 / (1 + rs))
         
+        # NATIVE MACD HESAPLAMASI
         ema12 = df['Close'].ewm(span=12, adjust=False).mean()
         ema26 = df['Close'].ewm(span=26, adjust=False).mean()
         df['MACD_12_26_9'] = ema12 - ema26
@@ -356,13 +340,11 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         son_fiyat = df['Close'].iloc[-1].item()
         rsi_val = df['RSI'].iloc[-1].item()
 
-        # PİYASA KAPALIYKEN ÇÖKMEYİ ÖNLEYEN AÇILIŞ/DEĞİŞİM MOTORU
         try:
-            son_veri_tarihi = df_all.index[-1].date()
-            gun_verisi = df_all[df_all.index.date == son_veri_tarihi]
+            bugun = df_all.index[-1].date()
+            gun_verisi = df_all[df_all.index.date == bugun]
             gun_acilisi = gun_verisi['Open'].iloc[0].item()
-            
-            onceki_gunler = df_all[df_all.index.date < son_veri_tarihi]
+            onceki_gunler = df_all[df_all.index.date < bugun]
             if not onceki_gunler.empty:
                 onceki_kapanis = onceki_gunler['Close'].iloc[-1].item()
                 gunluk_yuzde = ((son_fiyat - onceki_kapanis) / onceki_kapanis) * 100
@@ -389,6 +371,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             sapma = np.std(y - df_plot['Orta_Trend'])
             df_plot['Ust_Trend'] = df_plot['Orta_Trend'] + (sapma * 2)
             df_plot['Alt_Trend'] = df_plot['Orta_Trend'] - (sapma * 2)
+            
             son_ust = df_plot['Ust_Trend'].iloc[-1]
             son_alt = df_plot['Alt_Trend'].iloc[-1]
         else:
@@ -412,7 +395,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             kanal_durumu = f"📉 HİSSE DÜŞEN TREND KANALINDA İLERLİYOR (Negatif)"
             kanal_renk = "orange"
 
-        # GRAFİK ÇİZİMİ
+        # ALT GRAFİK PLOTLY YAPISI
         fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
         fig.add_trace(go.Candlestick(x=df_plot.index, open=df_plot['Open'], high=df_plot['High'], low=df_plot['Low'], close=df_plot['Close'], name="Fiyat", increasing_line_color='#00C853', increasing_fillcolor='#00C853', decreasing_line_color='#D50000', decreasing_fillcolor='#D50000'), row=1, col=1)
         fig.add_trace(go.Scatter(x=df_plot.index, y=df_plot['Ust_Trend'], name="Kanal Üst", line=dict(color='rgba(255, 152, 0, 0.8)', width=2, dash='dot')), row=1, col=1)
@@ -436,6 +419,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         fig.update_yaxes(showspikes=True, spikemode="across", spikedash="dot", fixedrange=False)
         fig.update_layout(height=700, template="plotly_white", xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#FFFFFF', margin=dict(l=10, r=60, t=10, b=10), hovermode="x unified", dragmode="zoom")
         
+        # GÜVENLİ ÇİZİM: Sadece veri tam doğrulanmışsa ekrana basıyoruz
         st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True})
 
         if kanal_renk == "green": st.success(kanal_durumu)
@@ -458,132 +442,230 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         roe_val = info_data.get('returnOnEquity', None)
         oto_sektor_fk, sektor_adi = otonom_sektor_hesapla(hisse)
 
-        # -----------------------------------------------------------------------------
-        # 🏢 ŞİRKET MALİ RÖNTGENİ VE SEKTÖR ORTALAMALARI
-        # -----------------------------------------------------------------------------
         st.markdown("### 🏢 ŞİRKET MALİ RÖNTGENİ")
-        c1, c2, c3, c4 = st.columns(4)
+        k1, k2, k3, k4, k5 = st.columns(5)
+        k1.metric("F/K", f"{fk_val:.2f}" if isinstance(fk_val, float) else "N/A")
+        k2.metric("PD/DD", f"{pddd_val:.2f}" if isinstance(pddd_val, float) else "N/A")
+        k3.metric("FD/FAVÖK", f"{info_data.get('enterpriseToEbitda', 'N/A')}")
+        k4.metric("FAVÖK Marjı", f"%{round(favok_marji*100, 2)}" if favok_marji else "N/A")
         
-        with c1:
+        if roe_val:
+            roe_yuzde = roe_val * 100
+            roe_str = f"%{roe_yuzde:.2f}"
+            if roe_yuzde > 30: k5.success(f"**ROE:** {roe_str} (Mükemmel)")
+            elif roe_yuzde > 15: k5.info(f"**ROE:** {roe_str} (İyi)")
+            else: k5.error(f"**ROE:** {roe_str} (Düşük)")
+        else: k5.metric("ROE", "N/A")
+
+        if oto_sektor_fk:
             if isinstance(fk_val, float):
-                st.metric("F/K Oranı", f"{fk_val:.2f}")
-                if otonom_sektor_fk:
-                    if fk_val < otonom_sektor_fk: st.caption(f"🟢 Sektörün altında ({sektor_adi} Ort: {otonom_sektor_fk})")
-                    else: st.caption(f"🔴 Sektörün üstünde ({sektor_adi} Ort: {otonom_sektor_fk})")
-            else: st.metric("F/K Oranı", "N/A")
-            
-        with c2:
-            if isinstance(pddd_val, float):
-                st.metric("PD/DD Oranı", f"{pddd_val:.2f}")
-                if pddd_val < 3.5: st.caption("🟢 Defter değerine göre dengeli fiyatlama")
-                else: st.caption("🟡 Sektörel olarak primli seviye")
-            else: st.metric("PD/DD Oranı", "N/A")
-            
-        with c3:
-            if roe_val:
-                st.metric("Özsermaye Kârlılığı (ROE)", f"%{roe_val*100:.1f}")
-                if roe_val > 0.30: st.caption("🔥 Enflasyon üzerinde güçlü kârlılık")
-                else: st.caption("🟡 Sermaye verimliliği geliştirilmeli")
-            else: st.metric("Özsermaye Kârlılığı (ROE)", "N/A")
-            
-        with c4:
-            if favok_marji:
-                st.metric("FAVÖK Marjı", f"%{favok_marji*100:.1f}")
-                if favok_marji > 0.15: st.caption("🏭 Operasyonel kârlılık ve nakit gücü yüksek")
-                else: st.caption("🟡 Üretim maliyetleri baskı yaratıyor")
-            else: st.metric("FAVÖK Marjı", "N/A")
-
-        # 🧠 YAPAY ZEKA MEKANİK PUANLAMA VE TAKTİK KUTUSU
-        st.markdown("### 🧠 YAPAY ZEKA TABANLI HİBRİT ANALİZ VE STRATEJİ")
+                if fk_val < oto_sektor_fk: st.success(f"✅ **UCUZ:** Hissenin F/K'sı ({fk_val:.2f}), {sektor_adi} sektör ortalamasının ({oto_sektor_fk}) altında.")
+                else: st.warning(f"⚠️ **PAHALI:** Hissenin F/K'sı ({fk_val:.2f}), {sektor_adi} sektör ortalamasının ({oto_sektor_fk}) üzerinde.")
+        
+        # AI PUANLAMA MOTORU
         ai_puan = 0.0
-        maddeler = []
+        ai_rapor_maddeleri = []
 
-        if isinstance(fk_val, float) and fk_val > 0 and fk_val < 15:
-            ai_puan += 1.0; maddeler.append(f"📊 F/K Oranı makul seviyede ({fk_val:.2f}).")
-            if otonom_sektor_fk and fk_val < otonom_sektor_fk:
-                ai_puan += 0.5; maddeler.append("Sektör ortalamasından daha ucuz fiyatlanıyor.")
-        if isinstance(pddd_val, float) and 0 < pddd_val < 3.5:
-            ai_puan += 1.0; maddeler.append(f"📑 PD/DD çarpanı varlıklarına göre makul ({pddd_val:.2f}).")
-        if roe_val and roe_val > 0.30:
-            ai_puan += 1.5; maddeler.append(f"💰 Özsermaye kârlılığı (%{roe_val*100:.1f}) şirketin büyüme hızını destekliyor.")
-        if favok_marji and favok_marji > 0.15:
-            ai_puan += 1.0; maddeler.append(f"🏭 FAVÖK marjı (%{favok_marji*100:.1f}) operasyonel olarak nakit üretebildiğini kanıtlıyor.")
+        if isinstance(fk_val, float) and fk_val > 0:
+            if oto_sektor_fk and fk_val < oto_sektor_fk: 
+                ai_puan += 1.5
+                ai_rapor_maddeleri.append(f"📊 **F/K Oranı Olumlu:** Hisse F/K'sı ({fk_val:.2f}), rakip {sektor_adi} sektör ortalamasından ({oto_sektor_fk}) daha iskontolu.")
+            elif fk_val < 15: 
+                ai_puan += 1.0
+                ai_rapor_maddeleri.append(f"📊 **F/K Oranı Makul:** Sektör verisi eksik fakat {fk_val:.2f} genel piyasa çarpanlarına göre makul.")
+            else:
+                ai_rapor_maddeleri.append(f"🔺 **F/K Oranı Yüksek:** Hisse çarpanı ({fk_val:.2f}) yüksek, kârlılığa oranla pahalı fiyatlanıyor olabilir.")
         
-        if 30 <= rsi_val <= 45:
-            ai_puan += 2.0; maddeler.append(f"🎯 RSI ({rsi_val:.1f}) akıllı para toplama/destek bölgesinde bulunuyor.")
-        elif rsi_val < 30:
-            ai_puan += 1.5; maddeler.append(f"🔥 RSI ({rsi_val:.1f}) aşırı satım bölgesinde, tepki yükselişi yakın olabilir.")
+        if isinstance(pddd_val, float):
+            if 0 < pddd_val < 3.5: 
+                ai_puan += 1.0
+                ai_rapor_maddeleri.append(f"📑 **Defter Değeri Dengeli:** PD/DD oranı {pddd_val:.2f} ile özsermayeye göre güvenli bölgede.")
+            else:
+                ai_rapor_maddeleri.append(f"🔺 **Yüksek PD/DD:** Özsermayesinin {pddd_val:.2f} katından işlem görüyor, primli yapı hakim.")
+
+        if roe_val:
+            if roe_val > 0.30: 
+                ai_puan += 1.5
+                ai_rapor_maddeleri.append(f"💰 **Mükemmel Özsermaye Kârlılığı (ROE):** %{roe_val*100:.2f} kârlılık ile şirket parasını çok verimli büyütüyor.")
+            elif roe_val > 0.15: 
+                ai_puan += 1.0
+                ai_rapor_maddeleri.append(f"💰 **Yeterli Kârlılık (ROE):** %{roe_val*100:.2f} kârlılık rasyosu enflasyon/faiz dengesinde makul.")
+        
+        if favok_marji and favok_marji > 0.15: 
+            ai_puan += 1.0
+            ai_rapor_maddeleri.append(f"🏭 **Güçlü Operasyonel Kâr:** FAVÖK marjı %{favok_marji*100:.2f} ile ana faaliyet alanında güçlü nakit üretiyor.")
+
+        if 30 <= rsi_val <= 45: 
+            ai_puan += 2.0  
+            ai_rapor_maddeleri.append(f"🎯 **RSI Toplama Bölgesinde:** RSI {rsi_val:.2f} seviyesinde; aşırı alımdan uzak, dönüş için ideal güç toplama alanında.")
+        elif 45 < rsi_val <= 60: 
+            ai_puan += 1.0 
+            ai_rapor_maddeleri.append(f"📊 **RSI Dengeli:** RSI {rsi_val:.2f} ile nötr bölgede, trend yön arayışında.")
+        elif rsi_val < 30: 
+            ai_puan += 1.5       
+            ai_rapor_maddeleri.append(f"🔥 **Aşırı Satım Bölgesi:** RSI {rsi_val:.2f} ile aşırı düştü, buralardan teknik tepki alımları gelebilir.")
+        else:
+            ai_rapor_maddeleri.append(f"⚠️ **RSI Şişkinlik Sinyali:** RSI {rsi_val:.2f} ile aşırı alım bölgesine yakın, kâr satışları tetiklenebilir.")
+
+        if son_fiyat > df['EMA50'].iloc[-1]: 
+            ai_puan += 1.0 
+            ai_rapor_maddeleri.append("📈 **EMA Trend Gücü Üstün:** Fiyat 50 günlük hareketli ortalamanın üzerinde kalarak orta vadeli yükselişi koruyor.")
+        else:
+            ai_rapor_maddeleri.append("📉 **EMA Trend Baskısı:** Orta vadeli EMA50 ortalamasının altında, satış baskısı sürüyor.")
             
-        if son_fiyat > df['EMA50'].iloc[-1]:
-            ai_puan += 1.0; maddeler.append("📈 Fiyat 50 günlük hareketli ortalamanın (EMA50) üzerinde tutunarak orta vadeli trend gücünü koruyor.")
-        if slope > 0:
-            ai_puan += 1.0; maddeler.append("📐 Doğrusal regresyon kanal eğimi pozitif, ana yön yukarı.")
+        if slope > 0: 
+            ai_puan += 1.0 
+            ai_rapor_maddeleri.append("📐 **Kanal Eğimi Pozitif:** Lineer regresyon kanal yönü yukarı eğimli, ana yön pozitif.")
 
-        ema100_val = df['EMA100'].iloc[-1]
-        fibo_618 = fib_seviyeleri["61.8%"]
-        if abs(son_fiyat - fibo_618) / fibo_618 < 0.05 or abs(son_fiyat - ema100_val) / ema100_val < 0.05:
-            ai_puan += 1.0; maddeler.append("🛡️ Hisse, Kaya Destek (Fibo %61.8 veya EMA100) bölgesine son derece yakın güvenli alanda.")
-
-        ai_puan = min(10.0, max(0.0, round(ai_puan, 1)))
-
-        col_p1, col_p2 = st.columns([0.2, 0.8])
-        with col_p1:
-            st.metric("YAPAY ZEKA SKORU", f"{ai_puan} / 10")
-        with col_p2:
-            if ai_puan >= 7.5: st.success("👑 ÇOK GÜÇLÜ KURULUM: Hem temel çarpanlar ucuz hem de teknik toplama bölgesinde. Risk/Ödül oranı mükemmel.")
-            elif ai_puan >= 5.5: st.warning("🟡 MAKUL / TAKİP MODU: Şikey güçlü ancak teknik olarak bir miktar primli veya trendin onaylanmasını bekliyor.")
-            else: st.error("⚪ ZAYIF SINIF / İZLE: Temel rasyolar pahalı veya teknik trend tamamen aşağı yönlü kırılmış durumda. Temkinli olunmalı.")
-
-        if maddeler:
-            st.markdown("**🔍 Robot Sinyal Gerekçeleri:**")
-            for m in maddeler: st.write(f"- {m}")
-
-        # 📊 KÜRESEL VE ULUSAL MAKRO ENDEKS MERKEZİ (BIST100 - BIST30 KORUNAN ALAN)
-        st.markdown("### 📊 KÜRESEL VE ULUSAL MAKRO ENDEKS MERKEZİ")
+        fibo_618 = fib_seviyeleri['61.8%']
+        ema_100 = df['EMA100'].iloc[-1]
+        fibo_fark = abs((son_fiyat - fibo_618) / fibo_618) if fibo_618 != 0 else 1
+        ema100_fark = abs((son_fiyat - ema_100) / ema_100) if ema_100 != 0 else 1
         
-        @st.cache_data(ttl=300)
-        def get_index_data_fixed():
-            try:
-                df_100 = yf.Ticker("XU100.IS").history(period="6mo", interval="1d")
-                df_30 = yf.Ticker("XU030.IS").history(period="6mo", interval="1d")
-                return df_100, df_30
-            except:
-                return pd.DataFrame(), pd.DataFrame()
+        if fibo_fark <= 0.05 or ema100_fark <= 0.05: 
+            ai_puan += 1.0 
+            ai_rapor_maddeleri.append("🛡️ **Kritik Kaya Destek Yakınlığı:** Fiyat, güçlü Fibonacci %61.8 veya EMA 100 kalesine çok yakın; risk/ödül oranı yüksek.")
 
-        df_x100, df_x030 = get_index_data_fixed()
+        ai_puan = min(10.0, max(0.0, round(ai_puan, 1))) 
+        doluluk_yuzdesi = int((ai_puan / 10.0) * 100)
+
+        # 🚀 ZAMAN VE GIT-GEL KORUMALI TELEGRAM ALARM MOTORU (6.0 BARAJI)
+        anlik_zaman = time.time()
         
-        def endeks_yorumla(df_i):
-            if df_i.empty or len(df_i) < 21: return "⚠️ Endeks verisi yüklenemedi.", "orange"
-            f_son = df_i['Close'].iloc[-1]
-            e21 = df_i['Close'].ewm(span=21, adjust=False).mean().iloc[-1]
-            if f_son > e21:
-                return f"📈 Endeks Pozitif Bölgede: Fiyat ({f_son:.2f}), EMA 21 ({e21:.2f}) üzerinde tutunuyor. Boğa iştahı korunuyor.", "green"
-            else:
-                return f"📉 Endeks Negatif Bölgede: Fiyat ({f_son:.2f}), EMA 21 ({e21:.2f}) altında baskılanıyor. Temkinli yaklaşım önerilir.", "red"
+        if ai_puan >= 6.0 and st.session_state[state_sinyal_key] == "NÖTR (İZLE)":
+            # Üst üste yığılma koruması: Son mesajın üzerinden en az 50 saniye geçmiş olmalı
+            if (anlik_zaman - st.session_state[state_zaman_key]) > 50.0:
+                
+                st.session_state[state_sinyal_key] = "ALINABİLİR / GÜÇLÜ"
+                st.session_state[state_fiyat_key] = son_fiyat
+                st.session_state[state_zaman_key] = anlik_zaman
+                
+                # Sadece onaylanan olumlu teknik/temel gerekçeleri mesaja ekleyelim
+                gerekce_metni = "\n".join([madde for madde in ai_rapor_maddeleri if "Olumlu" in madde or "Makul" in madde or "Bölgesinde" in madde or "Üstün" in madde or "Pozitif" in madde or "Yakınlığı" in madde])
+                
+                mesaj_metni = (
+                    f"🇹🇷 🤖 *BIST HİBRİT MOTOR ALERMİ*\n\n"
+                    f"**Hisse:** #{hisse.replace('.IS', '')}\n"
+                    f"**Anlık Fiyat:** `{son_fiyat:.2f} TL`\n"
+                    f"**Yapay Zeka Skoru:** `{ai_puan} / 10` 🎯 *(Baraj 6.0 Aşıldı)*\n\n"
+                    f"**🔍 Tetiklenme Gerekçeleri:**\n{gerekce_metni}\n\n"
+                    f"**📊 Önemli Rasyolar:**\n"
+                    f"- F/K: `{fk_val}` | PD/DD: `{pddd_val}`\n"
+                    f"- RSI: `{rsi_val:.2f}`"
+                )
+                telegram_bist_sinyal_gonder(mesaj_metni)
+                time.sleep(0.5) # Yarış durumlarını sönümleme payı
+            
+        elif ai_puan < 4.5:
+            # Histerezis (Schmitt Trigger): Skor 4.5'in altına tamamen soğumadan kilidi açmaz
+            st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
+            st.session_state[state_fiyat_key] = 0.0
+        
+        # SİZİN ORİJİNAL HTML ÖZET KUTUNUZ VE ARAYÜZÜNÜZ
+        st.markdown("<div class='ai-score-box'>", unsafe_allow_html=True)
+        st.markdown(f"<h2>🤖 YAPAY ZEKA HİBRİT KARAR MOTORU (ÖZET RAPOR)</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h1>{ai_puan} <span style='font-size: 1.5rem; color: #AAAAAA;'>/ 10</span></h1>", unsafe_allow_html=True)
+        
+        st.markdown(f"""
+        <div style="width: 100%; background-color: #111111; height: 14px; border-radius: 7px; margin-bottom: 20px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5);">
+            <div style="width: {doluluk_yuzdesi}%; background: linear-gradient(90deg, #FF8C00 0%, #FFD700 100%); height: 100%; border-radius: 7px; transition: width 1s ease-in-out; box-shadow: 0 0 10px rgba(255, 215, 0, 0.4);"></div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if rsi_val > 75 or son_fiyat >= son_ust:
+            st.error("🚨 **SİSTEM UYARISI: KÂR ALMA / SATIŞ BÖLGESİ! Fiyat doygunluğa ulaştı.**")
+        elif ai_puan >= 7.5:
+            st.success("🟢 **KUSURSUZ FIRSAT (GÜÇLÜ ALIM): Temel rasyolar ucuz ve teknik destekler sağlam konumda.**")
+        elif ai_puan >= 5.0:
+            st.warning("🟡 **POTANSİYEL (İZLEME VE KADEMELİ ALIM): Belirli kriterler olumlu fakat teyit beklenmeli.**")
+        else:
+            st.error("🔴 **RİSKLİ BÖLGE (UZAK DUR): Çarpanlar pahalı veya teknik göstergeler aşağı yönlü kırılım aşamasında.**")
+            
+        st.markdown("#### 🔍 SİSTEM GEREKÇELERİ VE SINYAL DETAYLARI:")
+        for madde in ai_rapor_maddeleri:
+            st.markdown(f"<span style='color: #FFFFFF !important;'>{madde}</span>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-        idx_c1, idx_c2 = st.columns(2)
-        with idx_c1:
-            st.markdown("#### 🎯 BIST 100 ENDEKS ANALİZİ (XU100)")
-            if df_x100.empty: st.warning("BIST 100 verisi çekilemedi.")
+        # ANA PİYASA DURUMU VE OTONOM YORUM MOTORU
+        st.markdown("---")
+        st.markdown("## 🌍 ANA PİYASA DURUMU (BIST 100 & 30)")
+        
+        @st.cache_data(ttl=60)
+        def get_index_data(symbol):
+            data = yf.download(symbol, period="6mo", interval="1d", progress=False)
+            if data.empty: return pd.DataFrame()
+            if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
+            data.columns = [str(c).strip().capitalize() for c in data.columns]
+            
+            data['EMA21'] = data['Close'].ewm(span=21, adjust=False).mean()
+            data['EMA50'] = data['Close'].ewm(span=50, adjust=False).mean()
+            
+            idx_delta = data['Close'].diff()
+            idx_gain = idx_delta.clip(lower=0)
+            idx_loss = -idx_delta.clip(upper=0)
+            idx_avg_gain = idx_gain.ewm(com=13, adjust=False).mean()
+            idx_avg_loss = idx_loss.ewm(com=13, adjust=False).mean()
+            idx_rs = idx_avg_gain / idx_avg_loss
+            data['RSI'] = 100 - (100 / (1 + idx_rs))
+            return data
+
+        def endeks_yorumla(df_idx):
+            if df_idx.empty: return "Veri alınamadı.", "gray"
+            son_kapanis = float(df_idx['Close'].iloc[-1])
+            e21 = float(df_idx['EMA21'].iloc[-1])
+            e50 = float(df_idx['EMA50'].iloc[-1])
+            rsi_idx = float(df_idx['RSI'].iloc[-1])
+            
+            if son_kapanis > e21 and e21 > e50:
+                trend = "🚀 GÜÇLÜ BOĞA PİYASASI: Endeks ana ortalamaların üzerinde, yükseliş trendi korunuyor."
+                renk = "green"
+            elif son_kapanis < e21 and e21 < e50:
+                trend = "💥 AYI PİYASASI BASKISI: Fiyat ortalamaların altında, temkinli olunmalı."
+                renk = "red"
             else:
-                fig_100 = go.Figure()
-                fig_100.add_trace(go.Scatter(x=df_x100.index, y=df_x100['Close'], line=dict(color='#2C3E50', width=2), name="BIST 100"))
-                fig_100.update_layout(height=250, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10))
-                st.plotly_chart(fig_100, use_container_width=True)
+                trend = "⏳ KONSOLİDASYON / KARARSIZ BÖLGE: Ortalamalar birbirine yakın, yatay seyir hakim."
+                renk = "orange"
+                
+            if rsi_idx > 70:
+                momentum = "⚠️ AŞIRI ALIM: RSI 70 üzerinde. Kısa vadeli kâr satışlarına dikkat edilmeli."
+            elif rsi_idx < 30:
+                momentum = "🔥 AŞIRI SATIM: RSI 30 altında. Tepki alımları gelebilir."
+            else:
+                momentum = f"📊 MOMENTUM DENGELİ: RSI {rsi_idx:.2f} ile dengeli / sağlıklı bölgede."
+                
+            return f"**Trend:** {trend}\n\n**Momentum:** {momentum}", renk
+
+        idx_col1, idx_col2 = st.columns(2)
+        with idx_col1:
+            st.subheader("BIST 100 (XU100)")
+            df_x100 = get_index_data("XU100.IS")
+            if not df_x100.empty:
+                son_100 = df_x100['Close'].iloc[-1].item()
+                onceki_100 = df_x100['Close'].iloc[-2].item()
+                degisim_100 = ((son_100 - onceki_100) / onceki_100) * 100
+                st.metric("Puan", f"{son_100:.2f}", f"{degisim_100:.2f}%")
+                
+                fig100 = go.Figure(go.Scatter(x=df_x100.index[-60:], y=df_x100['Close'].tail(60), line=dict(color='#1f77b4', width=3)))
+                fig100.update_layout(height=100, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis_visible=False, yaxis_visible=False)
+                st.plotly_chart(fig100, use_container_width=True)
                 
                 yorum_100, renk_100 = endeks_yorumla(df_x100)
                 if renk_100 == "green": st.success(yorum_100)
                 elif renk_100 == "red": st.error(yorum_100)
                 else: st.warning(yorum_100)
+
+        with idx_col2:
+            st.subheader("BIST 30 (XU030)")
+            df_x030 = get_index_data("XU030.IS")
+            if not df_x030.empty:
+                son_30 = df_x030['Close'].iloc[-1].item()
+                onceki_30 = df_x030['Close'].iloc[-2].item()
+                degisim_30 = ((son_30 - onceki_30) / onceki_30) * 100
+                st.metric("Puan", f"{son_30:.2f}", f"{degisim_30:.2f}%")
                 
-        with idx_c2:
-            st.markdown("#### 🚀 BIST 30 ENDEKS ANALİZİ (XU030)")
-            if df_x030.empty: st.warning("BIST 30 verisi çekilemedi.")
-            else:
-                fig_30 = go.Figure()
-                fig_30.add_trace(go.Scatter(x=df_x030.index, y=df_x030['Close'], line=dict(color='#8E44AD', width=2), name="BIST 30"))
-                fig_30.update_layout(height=250, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10))
-                st.plotly_chart(fig_30, use_container_width=True)
+                fig30 = go.Figure(go.Scatter(x=df_x030.index[-60:], y=df_x030['Close'].tail(60), line=dict(color='#9C27B0', width=3)))
+                fig30.update_layout(height=100, margin=dict(l=0, r=0, t=0, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis_visible=False, yaxis_visible=False)
+                st.plotly_chart(fig30, use_container_width=True)
                 
                 yorum_30, renk_30 = endeks_yorumla(df_x030)
                 if renk_30 == "green": st.success(yorum_30)
@@ -595,18 +677,21 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         if 'secili_hisse' not in st.session_state or st.session_state.secili_hisse != hisse:
             st.session_state.secili_hisse = hisse
             st.session_state.kullanici_maliyeti = float(son_fiyat)
-            
         maliyet = st.number_input("Hisse Alım Maliyetiniz (TL):", value=float(st.session_state.kullanici_maliyeti), step=0.01, format="%.2f")
         st.session_state.kullanici_maliyeti = maliyet 
-        
         h_kar, z_kes = st.columns(2)
         with h_kar: hedef_kar = st.slider("Hedef Kâr Yüzdesi (%):", 1, 100, 15)
         with z_kes: zarar_kes = st.slider("Zarar Kes (Stop Loss) Yüzdesi (%):", 1, 25, 5)
+        hedef_fiyat = maliyet * (1 + hedef_kar/100)
+        stop_fiyat = maliyet * (1 - zarar_kes/100)
+        anlik_durum_yuzde = ((son_fiyat - maliyet) / maliyet) * 100
+        c1, c2, c3 = st.columns(3)
+        c1.info(f"🎯 HEDEF FİYAT:\n### {hedef_fiyat:.2f} TL")
+        if anlik_durum_yuzde > 0: c2.success(f"📈 ANLIK DURUM:\n### +%{anlik_durum_yuzde:.2f}")
+        else: c2.error(f"📉 ANLIK DURUM:\n### %{anlik_durum_yuzde:.2f}")
+        c3.error(f"🛑 STOP FİYATI:\n### {stop_fiyat:.2f} TL")
         
-        hedef_fiyat = maliyet * (1 + (hedef_kar / 100))
-        stop_fiyat = maliyet * (1 - (zarar_kes / 100))
-        
-        st.markdown(f"🎯 Hedef Kâr Fiyatınız: **{hedef_fiyat:.2f} TL** | 🛑 Zarar Kes (Stop) Fiyatınız: **{stop_fiyat:.2f} TL**")
+
 # =================================================================================
 # ÇEKİRDEK 2: FULL HİBRİT RADAR
 # =================================================================================
