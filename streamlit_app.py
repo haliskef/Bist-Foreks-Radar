@@ -604,7 +604,7 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 
 # =================================================================================
 # =================================================================================
-# =================================================================================#
+# =================================================================================
 # =================================================================================
 # ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (HAFIZALI KİLİT, TELEGRAM VE MAKS GENİŞ TÜRKÇE HABER)
 # =================================================================================
@@ -614,21 +614,21 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
     
     # -----------------------------------------------------------------------------
     # TELEGRAM ENTEGRASYON BÖLÜMÜ
-    # BotFather'dan aldığın Token'ı ve userinfobot'tan aldığın Chat ID'yi buraya girebilirsin.
     # -----------------------------------------------------------------------------
     TELEGRAM_BOT_TOKEN = "8817119197:AAHcHADLXZ7DbLgJp7yskg94QO0Q6jJd85s"
     TELEGRAM_CHAT_ID = "1338802399"
 
     def telegram_sinyal_gonder(mesaj):
         """Kırılım anında Telegram üzerinden anlık bildirim atar."""
-        if TELEGRAM_BOT_TOKEN != "8817119197:AAHcHADLXZ7DbLgJp7yskg94QO0Q6jJd85s" and TELEGRAM_CHAT_ID != "1338802399":
+        # Şartı düzelttik: Eğer boş bırakılmadıysa mesaj gönderimini başlat
+        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
             try:
                 import requests
                 url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
                 payload = {"chat_id": TELEGRAM_CHAT_ID, "text": mesaj, "parse_mode": "Markdown"}
                 requests.post(url, json=payload, timeout=5)
             except Exception as e:
-                pass # Ana sistemin çalışmasını aksatmamak için hataları sessizce geçiyoruz
+                pass 
 
     secilen_forex_adi = st.selectbox("Analiz Edilecek Küresel Enstrüman:", list(forex_assets.keys()))
     forex_ticker = forex_assets[secilen_forex_adi]
@@ -647,7 +647,6 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
         st.markdown("### 📰 Küresel Makroekonomik Takvim (Maksimum Genişlik & Türkçe)")
         st.warning("⚠️ **Volatilite Uyarısı:** Yüksek etkili (3 Yıldızlı / Kırmızı) verilerin açıklanma saatlerinde teknik indikatörler devredışı kalabilir. Haber saatinden 15 dk önce ve sonra işlem riskini minimuma indirin.")
         
-        # HTML/CSS ile Streamlit şablon boşluklarını sıfırlayarak tam ekran genişliği sağlıyoruz
         ekonomik_takvim_html = """
         <div style="position: relative; width: 100%; margin: 0; padding: 0;">
             <style>
@@ -673,10 +672,21 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
         st.components.v1.html(ekonomik_takvim_html, height=950, scrolling=True)
         
     with fx_tab1:
-        with fx_tab1:
-            # 🔔 GEÇİCİ TELEGRAM TEST BUTONU (Mesajı aldıktan sonra bu 3 satırı silebilirsin)
-            if st.button("🚀 Sistem Bildirim Testini Tetikle"):
-                telegram_sinyal_gonder("🎯 *SİSTEM TESTİ BAŞARILI!*\n\nStreamlit uygulaması şu anda Telegram botuna doğrudan bağlı ve otonom sinyal göndermeye hazır.")
+        # 🕵️‍♂️ CANLI TELEGRAM TEST BUTONU (Gelişmiş Hata Dedektörlü)
+        if st.button("🚀 Sistem Bildirim Testini Tetikle"):
+            try:
+                import requests
+                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+                payload = {"chat_id": TELEGRAM_CHAT_ID, "text": "🎯 *SİSTEM TESTİ BAŞARILI!*\n\nStreamlit uygulaması şu anda Telegram botuna doğrudan bağlı ve otonom sinyal göndermeye hazır.", "parse_mode": "Markdown"}
+                response = requests.post(url, json=payload, timeout=5)
+                
+                if response.status_code == 200:
+                    st.success("🎯 Harika! Mesaj başarıyla gönderildi. Telefonunu kontrol et.")
+                else:
+                    st.error(f"❌ Telegram API Hata Döndürdü: {response.text}")
+            except Exception as e:
+                st.error(f"🚨 Sunucu/Ağ Bağlantı Hatası: {e}")
+
         try:
             df_fx = yf.download(tickers=forex_ticker, period="1mo", interval="1h", progress=False)
         except:
@@ -776,7 +786,6 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             long_skor = min(10.0, round(long_skor, 1))
             short_skor = min(10.0, round(short_skor, 1))
 
-            # Geçici anlık yön tespiti
             anlik_algoritma_yonu = "NÖTR (İZLE)"
             if long_skor >= 7.0 and long_skor >= short_skor:
                 anlik_algoritma_yonu = "LONG (YUKARI)"
@@ -788,7 +797,6 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 st.session_state[state_sinyal_key] = anlik_algoritma_yonu
                 st.session_state[state_fiyat_key] = son_fiyat
                 
-                # Sinyal ilk kilitlendiği an gidecek Telegram Mesaj Şablonu
                 hedef_tp = son_fiyat + (atr_val * 3.0) if anlik_algoritma_yonu == "LONG (YUKARI)" else son_fiyat - (atr_val * 3.0)
                 risk_sl = son_fiyat - (atr_val * 1.5) if anlik_algoritma_yonu == "LONG (YUKARI)" else son_fiyat + (atr_val * 1.5)
                 skor_val = long_skor if anlik_algoritma_yonu == "LONG (YUKARI)" else short_skor
@@ -809,7 +817,6 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
                 st.session_state[state_fiyat_key] = 0.0
 
-            # Durum Atamalarını session_state hafıza verilerine göre yapılandırıyoruz
             strateji_yonu = st.session_state[state_sinyal_key]
             
             if strateji_yonu == "LONG (YUKARI)":
@@ -825,7 +832,6 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 durum_msg = "🟡 TEST BÖLGESİ - BELİRLİ BİR SEVİYE KIRILIMI BEKLENİYOR"
                 sl_noktasi = son_fiyat - (atr_val * 2.0); tp_noktasi = son_fiyat + (atr_val * 2.0)
 
-            # Savaş Kartı Gösterimi
             st.markdown(f"""
                 <div style="background-color: {durum_color}; padding: 25px; border-radius: 15px; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
                     <h1 style="color: #FFFFFF !important; border: none; margin: 0; font-size: 2.2rem;">{secilen_forex_adi} // STRATEJİ: {strateji_yonu}</h1>
@@ -833,11 +839,10 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 </div>
             """, unsafe_allow_html=True)
 
-            # ÇİFT FİYAT DESTEKLİ METRIC SENSÖRLERİ (Sabit Giriş vs Anlık Canlı Takip)
             f1, f2, f3, f4, f5 = st.columns(5)
             if strateji_yonu != "NÖTR (İZLE)":
-                f1.metric("🎯 SİNYAL GİRİŞİ (SABİT)", f"{sinyal_tetik_fiyati:.4f}", help="Kırılımın geldiği ve dondurulduğu kalıcı fiyat seviyesi.")
-                f2.metric("⚡ ANLIK FİYAT (CANLI)", f"{son_fiyat:.4f}", delta=f"{son_fiyat - sinyal_tetik_fiyati:.4f}", help="Canlı akan fiyat ve girişten uzaklığı.")
+                f1.metric("🎯 SİNYAL GİRİŞİ (SABİT)", f"{sinyal_tetik_fiyati:.4f}")
+                f2.metric("⚡ ANLIK FİYAT (CANLI)", f"{son_fiyat:.4f}", delta=f"{son_fiyat - sinyal_tetik_fiyati:.4f}")
             else:
                 f1.metric("ANLIK FİYAT", f"{son_fiyat:.4f}")
                 f2.metric("GİRİŞ DURUMU", "BEKLEMEDE")
@@ -846,7 +851,6 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             f4.metric("🎯 OTONOM TP", f"{tp_noktasi:.4f}")
             f5.metric("🛑 OTONOM SL", f"{sl_noktasi:.4f}")
 
-            # PANEL YERLEŞİMİ (Sol: İstatistikler | Sağ: Gelişmiş Plotly)
             sol_p, sag_p = st.columns([1, 2])
             
             with sol_p:
@@ -865,9 +869,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 </div>
                 """, unsafe_allow_html=True)
                 
-                st.markdown("#### 🔍 Sinyal Gerekçeleri")
                 for neden in nedenler: st.write(f"- {neden}")
-                    
                 st.markdown("#### 🔬 Teknik Değerler")
                 st.write(f"**RSI Göstergesi:** {rsi_val:.2f}")
                 st.write(f"**Kristal Tavan (Box Üst):** {b_ust:.4f}")
