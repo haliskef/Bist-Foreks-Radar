@@ -84,7 +84,8 @@ forex_assets = {
 # =================================================================================
 # =================================================================================
 # =================================================================================
-# ÇEKİRDEK 1: LAZER MODU (ORİJİNAL YAPI KORUNARAK PİYASA KAPALI HATASI GİDERİLDİ)
+# =================================================================================
+# ÇEKİRDEK 1: LAZER MODU (PİYASA KAPALI VE MULTIINDEX HATALARI TAMAMEN GİDERİLDİ)
 # =================================================================================
 if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
     # JavaScript kilitlenmesini önlemek için interval'i 45 saniyeye çıkardık ve benzersiz key verdik
@@ -143,10 +144,9 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
     if "otonom_radar_aktif" not in st.session_state:
         st.session_state.otonom_radar_aktif = False
     if "otonom_son_gonderilenler" not in st.session_state:
-        st.session_state.otonom_son_gonderilenler = {} # Hisse -> Son gönderim zamanı
+        st.session_state.otonom_son_gonderilenler = {}
 
     def saf_arka_plan_tarayici():
-        """ Arayüzden bağımsız, BIST 100 listesini sürekli dönen izole fonksiyon """
         while True:
             for o_kod in bist100_otonom_liste:
                 try:
@@ -219,7 +219,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         st.session_state.otonom_radar_aktif = True
 
     # -----------------------------------------------------------------------------
-    # SİZİN MANUEL EKRAN KİLİTLERİNİZ VE ORİJİNAL AKIŞIN DEVAMI
+    # 🛠️ GELİŞMİŞ VERİ ÇEKME MOTORU (ZIRHLI VE MULTIINDEX KORUMALI)
     # -----------------------------------------------------------------------------
     state_sinyal_key = f"bist_hybrid_state_{hisse}"
     state_fiyat_key = f"bist_hybrid_price_{hisse}"
@@ -234,12 +234,34 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         try:
             ticker = yf.Ticker(kod)
             p = "2y" if interval in ["1h", "1d"] else "1mo"
-            data = ticker.history(period=p, interval=interval)
-            info = ticker.info
-            if data.empty: return pd.DataFrame(), {}
-            if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
+            # Olası MultiIndex yapısını engellemek için group_by="ticker" yerine düz formatta çekiyoruz
+            data = ticker.history(period=p, interval=interval, keepna=False)
+            
+            # Eğer piyasa kapalıysa ve veri kümesi boş geldiyse periyodu genişletip tekrar dene
+            if data.empty:
+                data = ticker.history(period="max", interval=interval, keepna=False)
+                
+            if data.empty: 
+                return pd.DataFrame(), {}
+                
+            # Sütun başlıklarını temizle ve MultiIndex durumunu çöz
+            if isinstance(data.columns, pd.MultiIndex): 
+                data.columns = data.columns.get_level_values(0)
             data.columns = [str(c).strip().capitalize() for c in data.columns]
             
+            # Gerekli ana kolonların varlığını garanti altına al
+            gerekli_kolonlar = ['Open', 'High', 'Low', 'Close', 'Volume']
+            for col in gerekli_kolonlar:
+                if col not in data.columns:
+                    # Eksik kolon varsa en azından bir önceki veriyi doldurmaya çalış veya çökmesini önle
+                    return pd.DataFrame(), {}
+            
+            try:
+                info = ticker.info
+                if not info or not isinstance(info, dict): info = {}
+            except:
+                info = {}
+                
             try:
                 if data.index.tzinfo is None:
                     if interval != "1d":
@@ -247,8 +269,10 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                 else:
                     data.index = data.index.tz_convert('Europe/Istanbul')
             except: pass
+            
             return data, info
-        except: return pd.DataFrame(), {}
+        except Exception as e: 
+            return pd.DataFrame(), {}
 
     @st.cache_data(ttl=3600)
     def otonom_sektor_hesapla(hisse_kodu):
@@ -297,7 +321,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
     df_all, info_data = get_full_data(hisse, zaman_sozlugu[secilen_int])
 
     if df_all.empty or 'Close' not in df_all.columns or len(df_all) < 5:
-        st.error("⚠️ Seçilen hisse için veri çekilemedi. Lütfen hisse kodunu kontrol edin veya sayfanın yenilenmesini bekleyin.")
+        st.error("⚠️ Seçilen hisse için veri çekilemedi veya şu an piyasalar kapalı olduğundan yfinance yanıt vermiyor. Lütfen hisse kodunu kontrol edin veya sayfanın kendi kendine yenilenmesini bekleyin.")
     else:
         df = df_all.copy()
         
@@ -333,7 +357,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         son_fiyat = df['Close'].iloc[-1].item()
         rsi_val = df['RSI'].iloc[-1].item()
 
-        # 🛡️ PİYASA KAPALI/AÇIK HATASIZ DEĞİŞİM VE AÇILIŞ HESAPLAYICI (SABİT ENDEKS MANTIĞI)
+        # 🛡️ PİYASA KAPALI/AÇIK HATASIZ DEĞİŞİM VE AÇILIŞ HESAPLAYICI
         try:
             gun_acilisi = df_all['Open'].iloc[-1].item()
             if len(df_all) > 1:
