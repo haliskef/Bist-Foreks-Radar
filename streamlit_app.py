@@ -236,8 +236,15 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
     def get_full_data(kod, interval):
         try:
             ticker = yf.Ticker(kod)
-            p = "2y" if interval in ["1h", "1d"] else "1mo"
+            # Piyasa kapalıysa veya kısa vadeli interval veri vermiyorsa otomatik olarak periyodu esnetiyoruz
+            p = "2y" if interval in ["1h", "1d"] else "3mo"
             data = ticker.history(period=p, interval=interval)
+            
+            # 📌 PİYASA KAPALIYKEN KİLİTLENMEYİ ÖNLEYEN EKLEME:
+            # Eğer piyasa kapalıysa ve seçilen periyotta veri gelmediyse, en azından analiz yapabilmek için '1d' (günlük) geniş veriye düşüyoruz.
+            if data.empty and interval != "1d":
+                data = ticker.history(period="2y", interval="1d")
+                
             info = ticker.info
             if data.empty: return pd.DataFrame(), {}
             if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
@@ -301,9 +308,10 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
 
     df_all, info_data = get_full_data(hisse, zaman_sozlugu[secilen_int])
 
-    # GÜVENLİK DUVARI: Veri yoksa veya boşsa Plotly fonksiyonunu çalıştırma, arayüzü kilitleme!
+    # 📌 PİYASA KAPALIYKEN İNCELEME YAPABİLMENİZ İÇİN GÜVENLİK DUVARI GÜNCELLENDİ:
+    # Eğer df_all tamamen boş kalırsa hata verir, ancak 5 bar ve üzeri geçmiş veri varsa sistemi kilitlemeden içeri alır.
     if df_all.empty or 'Close' not in df_all.columns or len(df_all) < 5:
-        st.error("⚠️ Seçilen hisse için veri çekilemedi veya piyasa kapalı. Lütfen sayfanın kendi kendine yenilenmesini bekleyin veya hisse kodunu kontrol edin.")
+        st.error("⚠️ Seçilen hisse için veri çekilemedi. Bağlantınızı veya hisse kodunu kontrol edin. Eğer piyasa kapalıysa, sistem otomatik olarak geçmiş verileri yüklemeye çalışıyor, lütfen bekleyin.")
     else:
         df = df_all.copy()
         
