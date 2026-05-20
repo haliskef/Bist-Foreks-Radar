@@ -568,8 +568,10 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
 elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
     st.markdown("## 📡 BIST 100 DERİN HİBRİT TARAMA (TEKNİK + TEMEL)")
     if 'hibrit_tablo_full' not in st.session_state:
-        try: st.session_state.hibrit_tablo_full = pd.read_csv("son_tarama_kaydi.csv")
-        except FileNotFoundError: st.session_state.hibrit_tablo_full = pd.DataFrame()
+        try: 
+            st.session_state.hibrit_tablo_full = pd.read_csv("son_tarama_kaydi.csv")
+        except FileNotFoundError: 
+            st.session_state.hibrit_tablo_full = pd.DataFrame()
 
     bist100_tam_liste = [
         "AEFES.IS", "AGHOL.IS", "AKBNK.IS", "AKCNS.IS", "AKFGY.IS", "AKSA.IS", "AKSEN.IS", "ALARK.IS", "ALBRK.IS", 
@@ -596,7 +598,15 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
                 t = yf.Ticker(kod)
                 hist = t.history(period="6mo", interval="1d")
                 inf = t.info
-                if hist.empty: continue
+                
+                if hist.empty or len(hist) < 5: 
+                    continue
+                
+                # Sütun İsimleri Temizleme Güvencesi (MultiIndex veya büyük/küçük harf kaymalarına karşı)
+                if isinstance(hist.columns, pd.MultiIndex): 
+                    hist.columns = hist.columns.get_level_values(0)
+                hist.columns = [str(c).strip().capitalize() for c in hist.columns]
+                
                 skor = 0
                 son_fiyat = hist['Close'].iloc[-1].item()
                 
@@ -629,12 +639,23 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
                     "Sistem Notu": "👑 ŞAMPİYON" if skor >= 4 else ("🟢 GÜÇLÜ" if skor == 3 else ("🟡 MAKUL" if skor == 2 else "⚪ İZLE"))
                 })
                 time.sleep(0.1)
-            except: pass
+            except: 
+                pass
             ilerleme.progress((i + 1) / len(bist100_tam_liste))
-        df_sonuc = pd.DataFrame(sonuclar).sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True)
-        st.session_state.hibrit_tablo_full = df_sonuc
-        df_sonuc.to_csv("son_tarama_kaydi.csv", index=False)
-        durum_m.success("✅ Kaydedildi!")
+        
+        # --- KEYERROR VE BOŞ LİSTE ENGELLEME KALKANI ---
+        if sonuclar:
+            df_sonuc = pd.DataFrame(sonuclar)
+            if "Hibrit Skor" in df_sonuc.columns:
+                df_sonuc = df_sonuc.sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True)
+            else:
+                df_sonuc = df_sonuc.reset_index(drop=True)
+                
+            st.session_state.hibrit_tablo_full = df_sonuc
+            df_sonuc.to_csv("son_tarama_kaydi.csv", index=False)
+            durum_m.success("✅ Tüm BIST listesi başarıyla tarandı ve kaydedildi!")
+        else:
+            durum_m.error("🚨 Canlı veri çekilemedi. Bağlantınızı kontrol edin veya yfinance API sınırlarına takılmamak için biraz bekleyip tekrar deneyin.")
 
     if not st.session_state.hibrit_tablo_full.empty:
         def renk_motoru(val):
