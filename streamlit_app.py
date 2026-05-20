@@ -86,7 +86,7 @@ forex_assets = {
     "META",     # Meta / Facebook (Sosyal Medya)
     "GOOGL",    # Alphabet / Google (Arama & Yapay Zeka)
     "AMD",      # AMD (Çip Üreticisi)
-    "NFLX"    # Netflix (Medya / Yayıncılık)
+    "NFLX",     # Netflix (Medya / Yayıncılık)
     
 }
 
