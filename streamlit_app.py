@@ -138,6 +138,10 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         "YKBNK.IS", "YYLGD.IS", "ZOREN.IS"
     ]
 
+    # Thread-Safe (İş parçacığı güvenli) küresel hafıza sözlüğü
+    if not hasattr(st, "_otonom_hafiza"):
+        st._otonom_hafiza = {}
+
     if "otonom_radar_aktif" not in st.session_state:
         st.session_state.otonom_radar_aktif = False
     if "otonom_son_gonderilenler" not in st.session_state:
@@ -194,10 +198,10 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                     # 🌟 FİLTRE: Puan 7.0 veya üzerindeyse ve son 1 saat içinde gönderilmediyse Telegram'a at
                     if o_puan >= 7.0:
                         simdi = time.time()
-                        son_atim_zamani = st.session_state.otonom_son_gonderilenler.get(hisse_temiz, 0.0)
+                        son_atim_zamani = st._otonom_hafiza.get(hisse_temiz, 0.0)
                         
                         if (simdi - son_atim_zamani) > 3600.0: # 1 saatlik spambot koruması
-                            st.session_state.otonom_son_gonderilenler[hisse_temiz] = simdi
+                            st._otonom_hafiza[hisse_temiz] = simdi
                             gerekce_metni = "\n".join(o_maddeler)
                             
                             radar_mesaj = (
@@ -212,8 +216,8 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                     
                     time.sleep(3.5) # Yahoo Finance'tan ban yememek için hisseler arası güvenli bekleme
                 except:
-                    time.sleep(2)
-            time.sleep(10) # Liste komple bittiğinde başa dönmeden önce kısa bir nefes al
+                    time.sleep(4) # Hata durumunda bekleme süresi artırıldı
+            time.sleep(15) # Liste komple bittiğinde başa dönmeden önce kısa bir nefes al
 
     # Arka plan thread'ini tek bir kez ayağa kaldırıyoruz (Arayüz kopyalanmasını engeller)
     if not st.session_state.otonom_radar_aktif:
@@ -234,32 +238,33 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         
     @st.cache_data(ttl=45)
     def get_full_data(kod, interval):
-        try:
-            ticker = yf.Ticker(kod)
-            p = "2y" if interval in ["1h", "1d"] else "1mo"
-            data = ticker.history(period=p, interval=interval)
-            
-            # 🛠️ HAFTASONU / PİYASA KAPALIYKEN KESİN ÇÖZÜM KONTROLÜ
-            # Eğer piyasa kapalıysa ve yfinance intraday (15m, 1h) veri vermeyi reddettiyse veya boş döndüyse:
-            if data.empty or len(data) < 5:
-                # Otomatik olarak stabil çalışan Günlük periyoda düşüp 2 yıllık geçmişi çekiyoruz
-                data = ticker.history(period="2y", interval="1d")
-                
-            info = ticker.info
-            if data.empty: return pd.DataFrame(), {}
-            if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
-            data.columns = [str(c).strip().capitalize() for c in data.columns]
-            
-            # Günlük grafiklerde çökmeye sebep olan zaman dilimi hatasını düzelttik
+        # Geçici kilitlenmelere ve ağ kopmalarına karşı 3 Kez Üst Üste İstek Deneme Kalkanı
+        for deneme in range(3):
             try:
-                if data.index.tzinfo is None:
-                    if interval != "1d" and len(data.index) > 0: # Sadece gün içi veride localise edilir
-                        data.index = data.index.tz_localize('UTC').tz_convert('Europe/Istanbul')
-                else:
-                    data.index = data.index.tz_convert('Europe/Istanbul')
-            except: pass
-            return data, info
-        except: return pd.DataFrame(), {}
+                ticker = yf.Ticker(kod)
+                p = "2y" if interval in ["1h", "1d"] else "1mo"
+                data = ticker.history(period=p, interval=interval)
+                
+                # 🛠️ HAFTASONU / PİYASA KAPALIYKEN KESİN ÇÖZÜM KONTROLÜ
+                if data.empty or len(data) < 5:
+                    data = ticker.history(period="2y", interval="1d")
+                    
+                info = ticker.info
+                if not data.empty:
+                    if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
+                    data.columns = [str(c).strip().capitalize() for c in data.columns]
+                    
+                    try:
+                        if data.index.tzinfo is None:
+                            if interval != "1d" and len(data.index) > 0: 
+                                data.index = data.index.tz_localize('UTC').tz_convert('Europe/Istanbul')
+                        else:
+                            data.index = data.index.tz_convert('Europe/Istanbul')
+                    except: pass
+                    return data, info
+            except Exception as e:
+                time.sleep(1) # Başarısız istekte 1 saniye bekle ve tekrar dene
+        return pd.DataFrame(), {}
 
     # Sektör hesaplama fonksiyonu (Aynı kalıyor)
     @st.cache_data(ttl=3600)
