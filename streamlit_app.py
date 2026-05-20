@@ -61,7 +61,7 @@ with st.sidebar:
     st.markdown("---")
 
 # FOREX VE KÜRESEL PİYASALAR SÖZLÜĞÜ
-forex_assets = {
+forex_assets = [
     "ONS ALTIN": "GC=F",
     "ONS GÜMÜŞ": "SI=F",
     "ONS BAKIR" : "HG=F",
@@ -86,9 +86,9 @@ forex_assets = {
     "META",     # Meta / Facebook (Sosyal Medya)
     "GOOGL",    # Alphabet / Google (Arama & Yapay Zeka)
     "AMD",      # AMD (Çip Üreticisi)
-    "NFLX",     # Netflix (Medya / Yayıncılık)
+    "NFLX"     # Netflix (Medya / Yayıncılık)
     
-}
+]
 
 # =================================================================================
 # =================================================================================
