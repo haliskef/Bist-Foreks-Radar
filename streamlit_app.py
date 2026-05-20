@@ -7,13 +7,14 @@ import pandas as pd
 import numpy as np
 import time
 import os
+import threading
 
 # ==========================================
 # 1. SAYFA AYARLARI VE ARAYÜZ TASARIMI
 # ==========================================
 st.set_page_config(layout="wide", page_title="BIST & KÜRESEL HİBRİT KOMUTA MERKEZİ")
 
-# UI/UX OPTİMİZASYONU
+# UI/UX OPTİMİZASYONU (Açık Tema Korundu)
 st.markdown("""
     <style>
     .main, .stApp { background-color: #FDFCF0 !important; }
@@ -60,7 +61,7 @@ with st.sidebar:
     ])
     st.markdown("---")
 
-# FOREX VE KÜRESEL PİYASALAR SÖZLÜĞÜ
+# KÜRESEL ENSTRÜMAN SÖZLÜĞÜ
 forex_assets = {
     "ONS ALTIN": "GC=F",
     "ONS GÜMÜŞ": "SI=F",
@@ -79,6 +80,36 @@ forex_assets = {
     "BTC/USD": "BTC-USD"
 }
 
+# TELEGRAM ENTEGRASYON BİLGİLERİ
+TELEGRAM_BOT_TOKEN = "8817119197:AAHcHADLXZ7DbLgJp7yskg94QO0Q6jJd85s"
+TELEGRAM_CHAT_ID = "1338802399"
+
+def telegram_mesaj_gonder(mesaj):
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+        try:
+            import requests
+            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+            payload = {"chat_id": TELEGRAM_CHAT_ID, "text": mesaj, "parse_mode": "Markdown"}
+            requests.post(url, json=payload, timeout=5)
+        except:
+            pass
+
+# OTONOM RADAR LİSTESİ (Lazer Modunda Arka Planda Çalışır)
+bist100_otonom_liste = [
+    "AEFES.IS", "AGHOL.IS", "AKBNK.IS", "AKCNS.IS", "AKFGY.IS", "AKSA.IS", "AKSEN.IS", "ALARK.IS", "ALBRK.IS", 
+    "ALFAS.IS", "ARCLK.IS", "ASELS.IS", "ASTOR.IS", "ASUZU.IS", "AYDEM.IS", "AYGAZ.IS", "BAGFS.IS", "BERA.IS", 
+    "BIENY.IS", "BIMAS.IS", "BRISA.IS", "BRSAN.IS", "BUCIM.IS", "CANTE.IS", "CCOLA.IS", "CIMSA.IS", "CWENE.IS", 
+    "DOAS.IS", "DOHOL.IS", "EGEEN.IS", "ECILC.IS", "EKGYO.IS", "ENERY.IS", "ENJSA.IS", "ENKAI.IS", "EREGL.IS", 
+    "EUREN.IS", "EUPWR.IS", "FROTO.IS", "GARAN.IS", "GENIL.IS", "GESAN.IS", "GLYHO.IS", "GUBRF.IS", "GWIND.IS", 
+    "HALKB.IS", "HEKTS.IS", "HKTM.IS", "HLGYO.IS", "IMASM.IS", "IPEKE.IS", "ISCTR.IS", "ISDMR.IS", "ISGYO.IS", 
+    "ISMEN.IS", "IZENR.IS", "KALES.IS", "KARSN.IS", "KCAER.IS", "KCHOL.IS", "KMPUR.IS", "KONTR.IS", "KONYA.IS", 
+    "KOZAA.IS", "KOZAL.IS", "KRDMD.IS", "KZBGY.IS", "MAVI.IS", "MGROS.IS", "MIATK.IS", "ODAS.IS", "OTKAR.IS", 
+    "OYAKC.IS", "PENTA.IS", "PETKM.IS", "PGSUS.IS", "PNLSN.IS", "QUAGR.IS", "SAHOL.IS", "SASA.IS", "SDTTR.IS", 
+    "SISE.IS", "SMRTG.IS", "SOKM.IS", "TABGD.IS", "TAVHL.IS", "TCELL.IS", "THYAO.IS", "TKFEN.IS", "TOASO.IS", 
+    "TSKB.IS", "TTKOM.IS", "TTRAK.IS", "TUKAS.IS", "TUPRS.IS", "ULKER.IS", "VAKBN.IS", "VESBE.IS", "VESTL.IS", 
+    "YKBNK.IS", "YYLGD.IS", "ZOREN.IS"
+]
+
 # =================================================================================
 # ÇEKİRDEK 1: LAZER MODU
 # =================================================================================
@@ -88,37 +119,9 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
     with st.sidebar:
         st.markdown("### ⚙️ HİSSE PARAMETRELERİ")
         hisse = st.text_input("HİSSE KODU", "THYAO.IS").upper()
-        zaman_sozlugu = {"15 Dakika": "15m", "1 Saat": "1h", "1 Gün": "1d"}
+        zaman_sozlugu = {"15 Dikika": "15m", "1 Saat": "1h", "1 Gün": "1d"}
         secilen_int = st.selectbox("VERİ SIKLIĞI", list(zaman_sozlugu.keys()), index=2)
         view_period = st.selectbox("GÖRÜNÜM ARALIĞI", ["1 Ay", "3 Ay", "6 Ay", "1 Yıl", "Tümü"], index=2)
-
-    TELEGRAM_BOT_TOKEN = "8817119197:AAHcHADLXZ7DbLgJp7yskg94QO0Q6jJd85s"
-    TELEGRAM_CHAT_ID = "1338802399"
-
-    def telegram_bist_sinyal_gonder(mesaj):
-        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
-            try:
-                import requests
-                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-                payload = {"chat_id": TELEGRAM_CHAT_ID, "text": mesaj, "parse_mode": "Markdown"}
-                requests.post(url, json=payload, timeout=5)
-            except Exception as e:
-                pass
-
-    bist100_otonom_liste = [
-        "AEFES.IS", "AGHOL.IS", "AKBNK.IS", "AKCNS.IS", "AKFGY.IS", "AKSA.IS", "AKSEN.IS", "ALARK.IS", "ALBRK.IS", 
-        "ALFAS.IS", "ARCLK.IS", "ASELS.IS", "ASTOR.IS", "ASUZU.IS", "AYDEM.IS", "AYGAZ.IS", "BAGFS.IS", "BERA.IS", 
-        "BIENY.IS", "BIMAS.IS", "BRISA.IS", "BRSAN.IS", "BUCIM.IS", "CANTE.IS", "CCOLA.IS", "CIMSA.IS", "CWENE.IS", 
-        "DOAS.IS", "DOHOL.IS", "EGEEN.IS", "ECILC.IS", "EKGYO.IS", "ENERY.IS", "ENJSA.IS", "ENKAI.IS", "EREGL.IS", 
-        "EUREN.IS", "EUPWR.IS", "FROTO.IS", "GARAN.IS", "GENIL.IS", "GESAN.IS", "GLYHO.IS", "GUBRF.IS", "GWIND.IS", 
-        "HALKB.IS", "HEKTS.IS", "HKTM.IS", "HLGYO.IS", "IMASM.IS", "IPEKE.IS", "ISCTR.IS", "ISDMR.IS", "ISGYO.IS", 
-        "ISMEN.IS", "IZENR.IS", "KALES.IS", "KARSN.IS", "KCAER.IS", "KCHOL.IS", "KMPUR.IS", "KONTR.IS", "KONYA.IS", 
-        "KOZAA.IS", "KOZAL.IS", "KRDMD.IS", "KZBGY.IS", "MAVI.IS", "MGROS.IS", "MIATK.IS", "ODAS.IS", "OTKAR.IS", 
-        "OYAKC.IS", "PENTA.IS", "PETKM.IS", "PGSUS.IS", "PNLSN.IS", "QUAGR.IS", "SAHOL.IS", "SASA.IS", "SDTTR.IS", 
-        "SISE.IS", "SMRTG.IS", "SOKM.IS", "TABGD.IS", "TAVHL.IS", "TCELL.IS", "THYAO.IS", "TKFEN.IS", "TOASO.IS", 
-        "TSKB.IS", "TTKOM.IS", "TTRAK.IS", "TUKAS.IS", "TUPRS.IS", "ULKER.IS", "VAKBN.IS", "VESBE.IS", "VESTL.IS", 
-        "YKBNK.IS", "YYLGD.IS", "ZOREN.IS"
-    ]
 
     if "otonom_radar_aktif" not in st.session_state:
         st.session_state.otonom_radar_aktif = False
@@ -182,14 +185,13 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                                 f"**Yapay Zeka Skoru:** `{o_puan} / 10` 🔥\n\n"
                                 f"**🔍 Tespit Edilen Güçlü Gerekçeler:**\n{gerekce_metni}\n"
                             )
-                            telegram_bist_sinyal_gonder(radar_mesaj)
+                            telegram_mesaj_gonder(radar_mesaj)
                     time.sleep(3.5)
                 except:
                     time.sleep(2)
             time.sleep(10)
 
     if not st.session_state.otonom_radar_aktif:
-        import threading
         t = threading.Thread(target=saf_arka_plan_tarayici, daemon=True)
         t.start()
         st.session_state.otonom_radar_aktif = True
@@ -208,15 +210,12 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             ticker = yf.Ticker(kod)
             p = "2y" if interval in ["1h", "1d"] else "1mo"
             data = ticker.history(period=p, interval=interval)
-            
             if data.empty or len(data) < 5:
                 data = ticker.history(period="2y", interval="1d")
-                
             info = ticker.info
             if data.empty: return pd.DataFrame(), {}
             if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
             data.columns = [str(c).strip().capitalize() for c in data.columns]
-            
             try:
                 if data.index.tzinfo is None:
                     if interval != "1d" and len(data.index) > 0:
@@ -296,19 +295,16 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         try:
             bugun = df_all.index[-1].date()
             gun_verisi = df_all[df_all.index.date == bugun]
-            
             if not gun_verisi.empty:
                 gun_acilisi = gun_verisi['Open'].iloc[0].item()
             else:
                 gun_acilisi = df_all['Open'].iloc[-1].item()
-                
             onceki_gunler = df_all[df_all.index.date < bugun]
             if not onceki_gunler.empty:
                 onceki_kapanis = onceki_gunler['Close'].iloc[-1].item()
                 gunluk_yuzde = ((son_fiyat - onceki_kapanis) / onceki_kapanis) * 100
                 delta_str = f"{gunluk_yuzde:.2f}%"
-            else: 
-                delta_str = None
+            else: delta_str = None
         except:
             gun_acilisi = df_all['Open'].iloc[-1].item()
             delta_str = None
@@ -492,6 +488,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         if 'secili_hisse' not in st.session_state or st.session_state.secili_hisse != hisse:
             st.session_state.secili_hisse = hisse
             st.session_state.kullanici_maliyeti = float(son_fiyat)
+            
         maliyet = st.number_input("Hisse Alım Maliyetiniz (TL):", value=float(st.session_state.kullanici_maliyeti), step=0.01, format="%.2f")
         st.session_state.kullanici_maliyeti = maliyet 
         h_kar, z_kes = st.columns(2)
@@ -570,7 +567,6 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
                 pass
             ilerleme.progress((i + 1) / len(bist100_tam_liste))
             
-        # 🛡️ GÜVENLİK BARİYERİ (VERİ ÇEKİLEMEDİYSE VEYA LİSTE BOŞSA KEYERROR'U ENGELLER)
         if sonuclar:
             df_sonuc = pd.DataFrame(sonuclar)
             if "Hibrit Skor" in df_sonuc.columns:
@@ -581,7 +577,7 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
             df_sonuc.to_csv("son_tarama_kaydi.csv", index=False)
             durum_m.success("✅ Kaydedildi!")
         else:
-            durum_m.error("🚨 Sunucu hatası veya internet kesintisi nedeniyle hiçbir hisse verisi çekilemedi. Lütfen tekrar deneyin.")
+            durum_m.error("🚨 Veri çekilemedi. Bağlantıyı kontrol edin.")
 
     if not st.session_state.hibrit_tablo_full.empty:
         def renk_motoru(val):
@@ -592,41 +588,29 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
         st.dataframe(styled_df, use_container_width=True, height=800)
 
 # =================================================================================
-# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR
+# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (Tamamen Onarılan Bölüm)
 # =================================================================================
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
     st_autorefresh(interval=60000, key="global_forex_multi_scan_v11_protected")
-    st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ (TÜM LİSTE ARKA PLANDA TARANIYOR)")
-
-    TELEGRAM_BOT_TOKEN = "8817119197:AAHcHADLXZ7DbLgJp7yskg94QO0Q6jJd85s"
-    TELEGRAM_CHAT_ID = "1338802399"
-
-    def telegram_sinyal_gonder(mesaj):
-        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
-            try:
-                import requests
-                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-                payload = {"chat_id": TELEGRAM_CHAT_ID, "text": mesaj, "parse_mode": "Markdown"}
-                requests.post(url, json=payload, timeout=5)
-            except:
-                pass
+    st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ (7/24 ARKA PLAN TARAYICISI)")
 
     if st.button("🧪 Bağlantı Hattını Test Et"):
         try:
             import requests
             url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-            payload = {"chat_id": TELEGRAM_CHAT_ID, "text": "🎯 *SİSTEM TESTİ BAŞARILI!*\\n\\nÇoklu tarama modunda Telegram hattınız aktiftir.", "parse_mode": "Markdown"}
+            payload = {"chat_id": TELEGRAM_CHAT_ID, "text": "🎯 *SİSTEM TESTİ BAŞARILI!*\n\nÇoklu tarama modunda Telegram hattınız aktiftir.", "parse_mode": "Markdown"}
             response = requests.post(url, json=payload, timeout=5)
             if response.status_code == 200: 
-                st.success("🎯 Harika! Mesaj başarıyla gönderildi. Telefonunu kontrol et.")
+                st.success("🎯 Harika! Mesaj başarıyla gönderildi.")
             else: 
-                st.error(f"❌ Telegram API Hata Döndürdü: {response.text}")
+                st.error(f"❌ Telegram Hata: {response.text}")
         except Exception as e:
-            st.error(f"🚨 Sunucu/Ağ Bağlantı Hatası: {e}")
+            st.error(f"🚨 Bağlantı Hatası: {e}")
 
-    st.info("🔄 **7/24 Arka Plan Tarayıcısı Aktif:** Menüde hangi enstrüman seçili olursa olsun, sistem arka planda tüm listeyi tarar ve herhangi birinde kırılım (sinyal) oluşursa anında cebinize gönderir.")
+    st.info("🔄 Sistem menüden bağımsız olarak tüm listeyi tarar, kırılım anında sinyal gönderir.")
     secilen_forex_adi = st.selectbox("Ekranda Detaylı İncelemek İstediğiniz Küresel Enstrüman:", list(forex_assets.keys()))
 
+    # Her enstrümanın kendi döngüsü ve FX Ekran Yapısı
     for asset_adi, asset_ticker in forex_assets.items():
         state_sinyal_key = f"fx_state_yon_{asset_adi}"
         state_fiyat_key = f"fx_lock_price_{asset_adi}"
@@ -674,6 +658,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             rsi_val = float(son_mum['RSI'])
             atr_val = float(son_mum['ATR'])
 
+            # Mum Formasyonları Kontrolleri
             is_bullish_pin = (son_mum['High'] - max(son_mum['Open'], son_mum['Close'])) < (abs(son_mum['Open'] - son_mum['Close']) * 0.2) and (min(son_mum['Open'], son_mum['Close']) - son_mum['Low']) > (abs(son_mum['Open'] - son_mum['Close']) * 2)
             is_bearish_pin = (son_mum['High'] - max(son_mum['Open'], son_mum['Close'])) > (abs(son_mum['Open'] - son_mum['Close']) * 2) and (min(son_mum['Open'], son_mum['Close']) - son_mum['Low']) < (abs(son_mum['Open'] - son_mum['Close']) * 0.2)
             is_bullish_engulfing = (onceki_mum['Close'] < onceki_mum['Open']) and (son_mum['Close'] > son_mum['Open']) and (son_mum['Close'] > onceki_mum['Open'])
@@ -724,7 +709,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             elif short_skor >= 6.5 and short_skor > long_skor: anlik_algoritma_yonu = "SHORT (AŞAĞI)"
 
             eski_yon = st.session_state[state_sinyal_key]
-            if anlik_algoritma_yonu != eski_yon and anlik_algoritma_yonu != "NÖTR (İZLE)":
+            if anlik_algoritma_yonu != grandfather_yon := eski_yon and anlik_algoritma_yonu != "NÖTR (İZLE)":
                 st.session_state[state_sinyal_key] = anlik_algoritma_yonu
                 st.session_state[state_fiyat_key] = son_fiyat
                 
@@ -734,22 +719,23 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 emoji = "🚀" if anlik_algoritma_yonu == "LONG (YUKARI)" else "💥"
                 
                 mesaj_metni = (
-                    f"{emoji} *OTONOM KIRILIM BİLDİRİMİ*\\n\\n"
-                    f"**Enstrüman:** {asset_adi}\\n"
-                    f"**Strateji Yönü:** {anlik_algoritma_yonu}\\n"
-                    f"**Giriş Seviyesi:** `{son_fiyat:.4f}`\\n"
-                    f"**Hedef (TP):** `{hedef_tp:.4f}`\\n"
-                    f"**Zarar Kes (SL):** `{risk_sl:.4f}`\\n"
+                    f"{emoji} *OTONOM KIRILIM BİLDİRİMİ*\n\n"
+                    f"**Enstrüman:** {asset_adi}\n"
+                    f"**Strateji Yönü:** {anlik_algoritma_yonu}\n"
+                    f"**Giriş Seviyesi:** `{son_fiyat:.4f}`\n"
+                    f"**Hedef (TP):** `{hedef_tp:.4f}`\n"
+                    f"**Zarar Kes (SL):** `{risk_sl:.4f}`\n"
                     f"**Sistem Güven Skoru:** `{skor_val}/10`"
                 )
-                telegram_sinyal_gonder(mesaj_metni)
+                telegram_mesaj_gonder(mesaj_metni)
             elif anlik_algoritma_yonu == "NÖTR (İZLE)":
                 st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
                 st.session_state[state_fiyat_key] = 0.0
 
+            # Detaylı grafik ve arayüz çizim bölümü (Yalnızca seçilen enstrüman için ekrana basılır)
             if asset_adi == secilen_forex_adi:
                 strateji_yonu = st.session_state[state_sinyal_key]
-                if strateji_yonu == "LONG (YUKARI)":
+                if Birds_eye := strateji_yonu == "LONG (YUKARI)":
                     ana_skor = long_skor; durum_color = "#2ECC71"; sinyal_tetik_fiyati = st.session_state[state_fiyat_key]
                     durum_msg = f"🚀 GÜÇLÜ BOĞA - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN SİNYAL SABİTLENDİ"
                     sl_noktasi = sinyal_tetik_fiyati - (atr_val * 1.5); tp_noktasi = sinyal_tetik_fiyati + (atr_val * 3.0)
