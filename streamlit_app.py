@@ -704,12 +704,14 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             if is_msb_bullish: long_skor += 1.0; nedenler.append("🟩 YAPI: Market Yapısı Yukarı Kırıldı (MSB Bullish +1.0)")
             if is_msb_bearish: short_skor += 1.0; nedenler.append("🟥 YAPI: Market Yapısı Aşağı Kırıldı (MSB Bearish +1.0)")
 
-            anlik_algoritma_yonu = "NÖTR (İZLE)"
+       anlik_algoritma_yonu = "NÖTR (İZLE)"
             if long_skor >= 6.5 and long_skor > short_skor: anlik_algoritma_yonu = "LONG (YUKARI)"
             elif short_skor >= 6.5 and short_skor > long_skor: anlik_algoritma_yonu = "SHORT (AŞAĞI)"
 
             eski_yon = st.session_state[state_sinyal_key]
-            if anlik_algoritma_yonu != grandfather_yon := eski_yon and anlik_algoritma_yonu != "NÖTR (İZLE)":
+            
+            # Düzenlenen ve hatası giderilen kısım:
+            if anlik_algoritma_yonu != eski_yon and anlik_algoritma_yonu != "NÖTR (İZLE)":
                 st.session_state[state_sinyal_key] = anlik_algoritma_yonu
                 st.session_state[state_fiyat_key] = son_fiyat
                 
