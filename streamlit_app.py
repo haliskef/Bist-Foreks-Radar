@@ -560,8 +560,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         c1.info(f"🎯 HEDEF FİYAT:\n### {hedef_fiyat:.2f} TL")
         if anlik_durum_yuzde > 0: c2.success(f"📈 ANLIK DURUM:\n### +%{anlik_durum_yuzde:.2f}")
         else: c2.error(f"📉 ANLIK DURUM:\n### %{anlik_durum_yuzde:.2f}")
-        c3.error(f"🛑 STOP FİYATI:\n### {stop_fiyat:.2f} TL")
-# =================================================================================       
+        c3.error(f"🛑 STOP FİYATI:\n### {stop_fiyat:.2f} TL")   
 # =================================================================================
 # =================================================================================
 # =================================================================================
