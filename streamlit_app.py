@@ -679,7 +679,7 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
             except Exception as e:
                 pass
                 
-            ilerleme.progress((i + 1) / len(bist100_tam_liste)
+            ilerleme.progress((i + 1) / len(bist100_tam_liste))
 # =================================================================================
 # =================================================================================
 # ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (TAM OTONOM ÇOKLU ENSTRÜMAN RADARI - ESKİ KORUMALI)
