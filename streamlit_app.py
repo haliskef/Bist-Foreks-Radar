@@ -708,13 +708,106 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
         if len(sonuclar) > 0:
             df_sonuc = pd.DataFrame(sonuclar)
             df_sonuc = df_sonuc.sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True)
+            st.session_state.hibrit_tablo_full = df_sonu# =================================================================================
+# ÇEKİRDEK 2: FULL HİBRİT RADAR (ORİJİNAL VE ZIRHLI SÜRÜM)
+# =================================================================================
+elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
+    st.markdown("## 📡 BIST 100 DERİN HİBRİT TARAMA (TEKNİK + TEMEL)")
+    if 'hibrit_tablo_full' not in st.session_state:
+        try: 
+            st.session_state.hibrit_tablo_full = pd.read_csv("son_tarama_kaydi.csv")
+        except FileNotFoundError: 
+            st.session_state.hibrit_tablo_full = pd.DataFrame()
+
+    bist100_tam_liste = [
+        "AEFES.IS", "AGHOL.IS", "AKBNK.IS", "AKCNS.IS", "AKFGY.IS", "AKSA.IS", "AKSEN.IS", "ALARK.IS", "ALBRK.IS", 
+        "ALFAS.IS", "ARCLK.IS", "ASELS.IS", "ASTOR.IS", "ASUZU.IS", "AYDEM.IS", "AYGAZ.IS", "BAGFS.IS", "BERA.IS", 
+        "BIENY.IS", "BIMAS.IS", "BRISA.IS", "BRSAN.IS", "BUCIM.IS", "CANTE.IS", "CCOLA.IS", "CIMSA.IS", "CWENE.IS", 
+        "DOAS.IS", "DOHOL.IS", "EGEEN.IS", "ECILC.IS", "EKGYO.IS", "ENERY.IS", "ENJSA.IS", "ENKAI.IS", "EREGL.IS", 
+        "EUREN.IS", "EUPWR.IS", "FROTO.IS", "GARAN.IS", "GENIL.IS", "GESAN.IS", "GLYHO.IS", "GUBRF.IS", "GWIND.IS", 
+        "HALKB.IS", "HEKTS.IS", "HKTM.IS", "HLGYO.IS", "IMASM.IS", "IPEKE.IS", "ISCTR.IS", "ISDMR.IS", "ISGYO.IS", 
+        "ISMEN.IS", "IZENR.IS", "KALES.IS", "KARSN.IS", "KCAER.IS", "KCHOL.IS", "KMPUR.IS", "KONTR.IS", "KONYA.IS", 
+        "KOZAA.IS", "KOZAL.IS", "KRDMD.IS", "KZBGY.IS", "MAVI.IS", "MGROS.IS", "MIATK.IS", "ODAS.IS", "OTKAR.IS", 
+        "OYAKC.IS", "PENTA.IS", "PETKM.IS", "PGSUS.IS", "PNLSN.IS", "QUAGR.IS", "SAHOL.IS", "SASA.IS", "SDTTR.IS", 
+        "SISE.IS", "SMRTG.IS", "SOKM.IS", "TABGD.IS", "TAVHL.IS", "TCELL.IS", "THYAO.IS", "TKFEN.IS", "TOASO.IS", 
+        "TSKB.IS", "TTKOM.IS", "TTRAK.IS", "TUKAS.IS", "TUPRS.IS", "ULKER.IS", "VAKBN.IS", "VESBE.IS", "VESTL.IS", 
+        "YKBNK.IS", "YYLGD.IS", "ZOREN.IS"
+    ]
+
+    if st.button("🚀 FULL DERİN TARAMAYI BAŞLAT", use_container_width=True):
+        ilerleme = st.progress(0)
+        durum_m = st.empty()
+        sonuclar = []
+        
+        for i, kod in enumerate(bist100_tam_liste):
+            durum_m.text(f"⏳ Analiz Ediliyor: {kod} ({i+1}/{len(bist100_tam_liste)})")
+            try:
+                t = yf.Ticker(kod)
+                hist = t.history(period="6mo", interval="1d")
+                inf = t.info
+                
+                if hist.empty or len(hist) < 5: 
+                    continue
+                
+                # yfinance güncellemelerine karşı sütun isimlerini temizleme güvencesi
+                if isinstance(hist.columns, pd.MultiIndex): 
+                    hist.columns = hist.columns.get_level_values(0)
+                hist.columns = [str(c).strip().capitalize() for c in hist.columns]
+                
+                skor = 0
+                son_fiyat = hist['Close'].iloc[-1].item()
+                
+                # Gösterge 1: EMA 21 Hesaplama ve Kontrolü
+                ema21_series = hist['Close'].ewm(span=21, adjust=False).mean()
+                ema21 = ema21_series.iloc[-1].item()
+                if son_fiyat > ema21: skor += 1
+                
+                # Gösterge 2: RSI Hesaplama ve Kontrolü
+                r_delta = hist['Close'].diff()
+                r_gain = r_delta.clip(lower=0)
+                r_loss = -r_delta.clip(upper=0)
+                r_avg_gain = r_gain.ewm(com=13, adjust=False).mean()
+                r_avg_loss = r_loss.ewm(com=13, adjust=False).mean()
+                r_rs = r_avg_gain / r_avg_loss
+                rsi_series = 100 - (100 / (1 + r_rs))
+                rsi = rsi_series.iloc[-1].item()
+                if 30 < rsi < 65: skor += 1
+                
+                # Gösterge 3, 4, 5: Temel Analiz Kontrolleri
+                fk = inf.get('trailingPE', 100)
+                if fk < 15: skor += 1
+                pddd = inf.get('priceToBook', 100)
+                if pddd < 3: skor += 1
+                roe = inf.get('returnOnEquity', 0)
+                if roe is not None and roe > 0.20: skor += 1
+
+                sonuclar.append({
+                    "Hisse": kod.replace(".IS", ""), "Fiyat": round(son_fiyat, 2),
+                    "F/K": round(fk, 2) if fk != 100 else "N/A", "PD/DD": round(pddd, 2) if pddd != 100 else "N/A",
+                    "ROE (%)": round(roe*100, 2) if roe else "N/A", "RSI": round(rsi, 2), "Hibrit Skor": skor,
+                    "Sistem Notu": "👑 ŞAMPİYON" if skor >= 4 else ("🟢 GÜÇLÜ" if skor == 3 else ("🟡 MAKUL" if skor == 2 else "⚪ İZLE"))
+                })
+                time.sleep(0.1)
+            except: 
+                pass
+                
+            ilerleme.progress((i + 1) / len(bist100_tam_liste))
+        
+        # --- ASLA ÇÖKMEYEN GÜVENLİK KALKANI ---
+        if len(sonuclar) > 0:
+            df_sonuc = pd.DataFrame(sonuclar)
+            if "Hibrit Skor" in df_sonuc.columns:
+                df_sonuc = df_sonuc.sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True)
+            else:
+                df_sonuc = df_sonuc.reset_index(drop=True)
+                
             st.session_state.hibrit_tablo_full = df_sonuc
             df_sonuc.to_csv("son_tarama_kaydi.csv", index=False)
-            durum_m.success("✅ Canlı veri kalkanı aşıldı, tarama başarıyla listelendi!")
+            durum_m.success("✅ Canlı tarama başarıyla tamamlandı ve güncellendi!")
         else:
-            durum_m.error("🚨 Yahoo sunucu bağlantısı tamamen reddetti. Lütfen kısa bir süre sonra tekrar deneyin.")
+            durum_m.error("🚨 Yahoo Finance bağlantısı şu an kapalı (Ban Devam Ediyor). Hafızadaki/Kayıtlı en son başarılı tarama tablosu aşağıda listelenmiştir.")
 
-    # Arayüz Tablo Çıktısı
+    # Sonuçların Tablo Halinde Gösterilmesi
     if 'hibrit_tablo_full' in st.session_state and not st.session_state.hibrit_tablo_full.empty:
         def renk_motoru(val):
             if val == "👑 ŞAMPİYON": return 'background-color: #FFD700; color: black; font-weight: bold;'
