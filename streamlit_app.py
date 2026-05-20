@@ -245,7 +245,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                 p = "2y" if interval in ["1h", "1d"] else "1mo"
                 data = ticker.history(period=p, interval=interval)
                 
-                # 🛠️ HAFTASONU / PİYASA KAPALIYKEN KESİN ÇÖZÜM KONTROLÜ
+                # HAFTASONU / GECELERİ PİYASA KAPALIYKEN BOŞ VERİ DÖNMESİNİ ÖNLEYEN KONTROL
                 if data.empty or len(data) < 5:
                     data = ticker.history(period="2y", interval="1d")
                     
@@ -263,7 +263,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                     except: pass
                     return data, info
             except Exception as e:
-                time.sleep(1) # Başarısız istekte 1 saniye bekle ve tekrar dene
+                time.sleep(2) # Başarısız istekte Yahoo'yu yormamak için 2 saniye bekle ve tekrar dene
         return pd.DataFrame(), {}
 
     # Sektör hesaplama fonksiyonu (Aynı kalıyor)
