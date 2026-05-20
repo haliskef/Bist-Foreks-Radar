@@ -7,6 +7,12 @@ import pandas as pd
 import numpy as np
 import time
 import os
+import time
+import threading
+import numpy as np
+import pandas as pd
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # ==========================================
 # 1. SAYFA AYARLARI VE ARAYÜZ TASARIMI
@@ -87,14 +93,6 @@ forex_assets = {
 if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
     # JavaScript kilitlenmesini önlemek için interval'i 45 saniyeye çıkardık ve benzersiz key verdik
     st_autorefresh(interval=45000, limit=500, key="lazer_canli_guncelleme_fixed")
-    
-    # Zaman ve Arka plan iş parçacığı kütüphanelerini dahil ediyoruz
-    import time
-    import threading
-    import numpy as np
-    import pandas as pd
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
 
     with st.sidebar:
         st.markdown("### ⚙️ HİSSE PARAMETRELERİ")
@@ -236,12 +234,12 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
     def get_full_data(kod, interval):
         try:
             ticker = yf.Ticker(kod)
-            # Piyasa kapalıysa veya kısa vadeli interval veri vermiyorsa otomatik olarak periyodu esnetiyoruz
-            p = "2y" if interval in ["1h", "1d"] else "3mo"
+            p = "2y" if interval in ["1h", "1d"] else "1mo"
             data = ticker.history(period=p, interval=interval)
             
-            # 📌 PİYASA KAPALIYKEN KİLİTLENMEYİ ÖNLEYEN EKLEME:
-            # Eğer piyasa kapalıysa ve seçilen periyotta veri gelmediyse, en azından analiz yapabilmek için '1d' (günlük) geniş veriye düşüyoruz.
+            # 📌 HAFTASONU / PİYASA KAPALIYKEN KİLİTLENMEYİ ÖNLEYEN KONTROL:
+            # Eğer piyasa kapalıysa ve seçilen interval (örneğin 15m veya 1h) veri vermiyorsa,
+            # sistemin kilitlenip boş kalmaması için otomatik olarak günlük '1d' geçmiş veriye düşüyoruz.
             if data.empty and interval != "1d":
                 data = ticker.history(period="2y", interval="1d")
                 
@@ -308,10 +306,9 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
 
     df_all, info_data = get_full_data(hisse, zaman_sozlugu[secilen_int])
 
-    # 📌 PİYASA KAPALIYKEN İNCELEME YAPABİLMENİZ İÇİN GÜVENLİK DUVARI GÜNCELLENDİ:
-    # Eğer df_all tamamen boş kalırsa hata verir, ancak 5 bar ve üzeri geçmiş veri varsa sistemi kilitlemeden içeri alır.
+    # 📌 GÜVENLİK DUVARI: Piyasa kapalıyken veya haftasonu geçmiş verilerle analizin devam etmesi için şart esnetildi
     if df_all.empty or 'Close' not in df_all.columns or len(df_all) < 5:
-        st.error("⚠️ Seçilen hisse için veri çekilemedi. Bağlantınızı veya hisse kodunu kontrol edin. Eğer piyasa kapalıysa, sistem otomatik olarak geçmiş verileri yüklemeye çalışıyor, lütfen bekleyin.")
+        st.error("⚠️ Seçilen hisse için veri çekilemedi. Bağlantınızı veya hisse kodunu kontrol edin.")
     else:
         df = df_all.copy()
         
@@ -426,7 +423,6 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         fig.update_yaxes(showspikes=True, spikemode="across", spikedash="dot", fixedrange=False)
         fig.update_layout(height=700, template="plotly_white", xaxis_rangeslider_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='#FFFFFF', margin=dict(l=10, r=60, t=10, b=10), hovermode="x unified", dragmode="zoom")
         
-        # GÜVENLİ ÇİZİM: Sadece veri tam doğrulanmışsa ekrana basıyoruz
         st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True})
 
         if kanal_renk == "green": st.success(kanal_durumu)
@@ -540,14 +536,12 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         anlik_zaman = time.time()
         
         if ai_puan >= 6.0 and st.session_state[state_sinyal_key] == "NÖTR (İZLE)":
-            # Üst üste yığılma koruması: Son mesajın üzerinden en az 50 saniye geçmiş olmalı
             if (anlik_zaman - st.session_state[state_zaman_key]) > 50.0:
                 
                 st.session_state[state_sinyal_key] = "ALINABİLİR / GÜÇLÜ"
                 st.session_state[state_fiyat_key] = son_fiyat
                 st.session_state[state_zaman_key] = anlik_zaman
                 
-                # Sadece onaylanan olumlu teknik/temel gerekçeleri mesaja ekleyelim
                 gerekce_metni = "\n".join([madde for madde in ai_rapor_maddeleri if "Olumlu" in madde or "Makul" in madde or "Bölgesinde" in madde or "Üstün" in madde or "Pozitif" in madde or "Yakınlığı" in madde])
                 
                 mesaj_metni = (
@@ -561,14 +555,12 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                     f"- RSI: `{rsi_val:.2f}`"
                 )
                 telegram_bist_sinyal_gonder(mesaj_metni)
-                time.sleep(0.5) # Yarış durumlarını sönümleme payı
+                time.sleep(0.5)
             
         elif ai_puan < 4.5:
-            # Histerezis (Schmitt Trigger): Skor 4.5'in altına tamamen soğumadan kilidi açmaz
             st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
             st.session_state[state_fiyat_key] = 0.0
         
-        # SİZİN ORİJİNAL HTML ÖZET KUTUNUZ VE ARAYÜZÜNÜZ
         st.markdown("<div class='ai-score-box'>", unsafe_allow_html=True)
         st.markdown(f"<h2>🤖 YAPAY ZEKA HİBRİT KARAR MOTORU (ÖZET RAPOR)</h2>", unsafe_allow_html=True)
         st.markdown(f"<h1>{ai_puan} <span style='font-size: 1.5rem; color: #AAAAAA;'>/ 10</span></h1>", unsafe_allow_html=True)
@@ -697,7 +689,6 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         if anlik_durum_yuzde > 0: c2.success(f"📈 ANLIK DURUM:\n### +%{anlik_durum_yuzde:.2f}")
         else: c2.error(f"📉 ANLIK DURUM:\n### %{anlik_durum_yuzde:.2f}")
         c3.error(f"🛑 STOP FİYATI:\n### {stop_fiyat:.2f} TL")
-        
 # =================================================================================
 # ÇEKİRDEK 2: FULL HİBRİT RADAR
 # =================================================================================
