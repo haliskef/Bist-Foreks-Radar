@@ -61,7 +61,7 @@ with st.sidebar:
     st.markdown("---")
 
 # FOREX VE KÜRESEL PİYASALAR SÖZLÜĞÜ
-forex_assets = [
+forex_assets = {
     "ONS ALTIN": "GC=F",
     "ONS GÜMÜŞ": "SI=F",
     "ONS BAKIR" : "HG=F",
@@ -78,17 +78,17 @@ forex_assets = [
     "ETH/USD": "ETH-USD",
     "BTC/USD": "BTC-USD",
     # --- AMERİKA HİSSE DEVLERİ (NASDAQ & NYSE) ---
-    "NVDA",     # Nvidia (Yapay Zeka Öncüsü)
-    "TSLA",     # Tesla (Elektrikli Araç & Teknoloji)
-    "AAPL",     # Apple (Teknoloji & Donanım)
-    "MSFT",     # Microsoft (Yazılım & Bulut)
-    "AMZN",     # Amazon (E-Ticaret & Bulut)
-    "META",     # Meta / Facebook (Sosyal Medya)
-    "GOOGL",    # Alphabet / Google (Arama & Yapay Zeka)
-    "AMD",      # AMD (Çip Üreticisi)
-    "NFLX"     # Netflix (Medya / Yayıncılık)
+     "NVDA": "Nvidia Corporation",
+     "TSLA": "Tesla Inc.",
+     "AAPL": "Apple Inc.",
+     "MSFT": "Microsoft Corporation",
+     "AMZN": "Amazon.com Inc.",
+     "META": "Meta Platforms Inc.",
+     "GOOGL": "Alphabet (Google) Inc.",
+     "AMD": "Advanced Micro Devices",
+     "NFLX": "Netflix Inc."
     
-]
+    }
 
 # =================================================================================
 # =================================================================================
