@@ -7,12 +7,6 @@ import pandas as pd
 import numpy as np
 import time
 import os
-import time
-import threading
-import numpy as np
-import pandas as pd
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 # ==========================================
 # 1. SAYFA AYARLARI VE ARAYÜZ TASARIMI
@@ -93,6 +87,14 @@ forex_assets = {
 if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
     # JavaScript kilitlenmesini önlemek için interval'i 45 saniyeye çıkardık ve benzersiz key verdik
     st_autorefresh(interval=45000, limit=500, key="lazer_canli_guncelleme_fixed")
+    
+    # Zaman ve Arka plan iş parçacığı kütüphanelerini dahil ediyoruz
+    import time
+    import threading
+    import numpy as np
+    import pandas as pd
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
 
     with st.sidebar:
         st.markdown("### ⚙️ HİSSE PARAMETRELERİ")
@@ -237,10 +239,10 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             p = "2y" if interval in ["1h", "1d"] else "1mo"
             data = ticker.history(period=p, interval=interval)
             
-            # 📌 HAFTASONU / PİYASA KAPALIYKEN KİLİTLENMEYİ ÖNLEYEN KONTROL:
-            # Eğer piyasa kapalıysa ve seçilen interval (örneğin 15m veya 1h) veri vermiyorsa,
-            # sistemin kilitlenip boş kalmaması için otomatik olarak günlük '1d' geçmiş veriye düşüyoruz.
-            if data.empty and interval != "1d":
+            # 🛠️ HAFTASONU / PİYASA KAPALIYKEN KESİN ÇÖZÜM KONTROLÜ
+            # Eğer piyasa kapalıysa ve yfinance intraday (15m, 1h) veri vermeyi reddettiyse veya boş döndüyse:
+            if data.empty or len(data) < 5:
+                # Otomatik olarak stabil çalışan Günlük periyoda düşüp 2 yıllık geçmişi çekiyoruz
                 data = ticker.history(period="2y", interval="1d")
                 
             info = ticker.info
@@ -251,7 +253,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
             # Günlük grafiklerde çökmeye sebep olan zaman dilimi hatasını düzelttik
             try:
                 if data.index.tzinfo is None:
-                    if interval != "1d": # Günlük veride localize işlemi yapılmaz
+                    if interval != "1d" and len(data.index) > 0: # Sadece gün içi veride localise edilir
                         data.index = data.index.tz_localize('UTC').tz_convert('Europe/Istanbul')
                 else:
                     data.index = data.index.tz_convert('Europe/Istanbul')
@@ -306,7 +308,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
 
     df_all, info_data = get_full_data(hisse, zaman_sozlugu[secilen_int])
 
-    # 📌 GÜVENLİK DUVARI: Piyasa kapalıyken veya haftasonu geçmiş verilerle analizin devam etmesi için şart esnetildi
+    # 📌 KONTROL: Eğer iki kademeli veri çekimi de başarısız olduysa ana uyarıyı bas
     if df_all.empty or 'Close' not in df_all.columns or len(df_all) < 5:
         st.error("⚠️ Seçilen hisse için veri çekilemedi. Bağlantınızı veya hisse kodunu kontrol edin.")
     else:
@@ -335,8 +337,8 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         df['MACDs_12_26_9'] = df['MACD_12_26_9'].ewm(span=9, adjust=False).mean()
         df['MACDh_12_26_9'] = df['MACD_12_26_9'] - df['MACDs_12_26_9']
         
-        if view_period == "1 Ay": df_plot = df.tail(30 if secilen_int == "1 Gün" else 150).copy()
-        elif view_period == "3 Ay": df_plot = df.tail(90 if secilen_int == "1 Gün" else 400).copy()
+        if view_period == "1 Ay": df_plot = df.tail(30).copy()
+        elif view_period == "3 Ay": df_plot = df.tail(90).copy()
         elif view_period == "6 Ay": df_plot = df.tail(180).copy()
         elif view_period == "1 Yıl": df_plot = df.tail(365).copy()
         else: df_plot = df.copy()
