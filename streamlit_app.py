@@ -552,7 +552,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
                 gerekce_metni = "\n".join([madde for madde in ai_rapor_maddeleri if "Olumlu" in madde or "Makul" in madde or "Bölgesinde" in madde or "Üstün" in madde or "Pozitif" in madde or "Yakınlığı" in madde])
                 
                 mesaj_metni = (
-                    f"🇹🇷 🤖 *BIST HİBRİT MOTOR ALERMİ*\n\n"
+                    f"🇹🇷 🤖 *BIST HİBRİT MOTOR ALARMI*\n\n"
                     f"**Hisse:** #{hisse.replace('.IS', '')}\n"
                     f"**Anlık Fiyat:** `{son_fiyat:.2f} TL`\n"
                     f"**Yapay Zeka Skoru:** `{ai_puan} / 10` 🎯 *(Baraj 6.0 Aşıldı)*\n\n"
