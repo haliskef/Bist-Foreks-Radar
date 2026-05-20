@@ -492,7 +492,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
         if 'secili_hisse' not in st.session_state or st.session_state.secili_hisse != hisse:
             st.session_state.secili_hisse = hisse
             st.session_state.kullanici_maliyeti = float(son_fiyat)
-        maliyet = st.number_input("Hisse Alım Maliyetiniz (TL):", value=float(st.session_state.kullanici_maliyeti), step=0.01, format=\"%.2f\")
+        maliyet = st.number_input("Hisse Alım Maliyetiniz (TL):", value=float(st.session_state.kullanici_maliyeti), step=0.01, format="%.2f")
         st.session_state.kullanici_maliyeti = maliyet 
         h_kar, z_kes = st.columns(2)
         with h_kar: hedef_kar = st.slider("Hedef Kâr Yüzdesi (%):", 1, 100, 15)
