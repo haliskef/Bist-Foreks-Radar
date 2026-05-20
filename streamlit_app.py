@@ -708,8 +708,10 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
         if len(sonuclar) > 0:
             df_sonuc = pd.DataFrame(sonuclar)
             df_sonuc = df_sonuc.sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True)
-            st.session_state.hibrit_tablo_full = df_sonu# =================================================================================
-# ÇEKİRDEK 2: FULL HİBRİT RADAR (ORİJİNAL VE ZIRHLI SÜRÜM)
+            st.session_state.hibrit_tablo_full = df_sonu
+# =================================================================================
+# =================================================================================
+# ÇEKİRDEK 2: FULL HİBRİT RADAR (SABIRLI VE AKILLI EMNİYET SÜRÜMÜ)
 # =================================================================================
 elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
     st.markdown("## 📡 BIST 100 DERİN HİBRİT TARAMA (TEKNİK + TEMEL)")
@@ -740,7 +742,14 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
         sonuclar = []
         
         for i, kod in enumerate(bist100_tam_liste):
-            durum_m.text(f"⏳ Analiz Ediliyor: {kod} ({i+1}/{len(bist100_tam_liste)})")
+            # --- AKILLI MOLA KALKANI ---
+            # Her 15 hissede bir Yahoo sunucularını yormamak için 4 saniyelik kurumsal mola verilir
+            if i > 0 and i % 15 == 0:
+                durum_m.text("💤 Anti-Ban Sistemi Aktif: Sunucular Dinlendiriliyor (4 Saniye)...")
+                time.sleep(4.0)
+                
+            durum_m.text(f"⏳ Emniyetli Modda Analiz Ediliyor: {kod} ({i+1}/{len(bist100_tam_liste)})")
+            
             try:
                 t = yf.Ticker(kod)
                 hist = t.history(period="6mo", interval="1d")
@@ -749,7 +758,7 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
                 if hist.empty or len(hist) < 5: 
                     continue
                 
-                # yfinance güncellemelerine karşı sütun isimlerini temizleme güvencesi
+                # MultiIndex sütun kaymalarına karşı koruma kalkanı
                 if isinstance(hist.columns, pd.MultiIndex): 
                     hist.columns = hist.columns.get_level_values(0)
                 hist.columns = [str(c).strip().capitalize() for c in hist.columns]
@@ -757,12 +766,12 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
                 skor = 0
                 son_fiyat = hist['Close'].iloc[-1].item()
                 
-                # Gösterge 1: EMA 21 Hesaplama ve Kontrolü
+                # Gösterge 1: EMA 21 Kontrolü
                 ema21_series = hist['Close'].ewm(span=21, adjust=False).mean()
                 ema21 = ema21_series.iloc[-1].item()
                 if son_fiyat > ema21: skor += 1
                 
-                # Gösterge 2: RSI Hesaplama ve Kontrolü
+                # Gösterge 2: RSI Kontrolü
                 r_delta = hist['Close'].diff()
                 r_gain = r_delta.clip(lower=0)
                 r_loss = -r_delta.clip(upper=0)
@@ -773,7 +782,7 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
                 rsi = rsi_series.iloc[-1].item()
                 if 30 < rsi < 65: skor += 1
                 
-                # Gösterge 3, 4, 5: Temel Analiz Kontrolleri
+                # Gösterge 3, 4, 5: Temel Rasyolar
                 fk = inf.get('trailingPE', 100)
                 if fk < 15: skor += 1
                 pddd = inf.get('priceToBook', 100)
@@ -787,13 +796,16 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
                     "ROE (%)": round(roe*100, 2) if roe else "N/A", "RSI": round(rsi, 2), "Hibrit Skor": skor,
                     "Sistem Notu": "👑 ŞAMPİYON" if skor >= 4 else ("🟢 GÜÇLÜ" if skor == 3 else ("🟡 MAKUL" if skor == 2 else "⚪ İZLE"))
                 })
-                time.sleep(0.1)
+                
+                # Sabit kontrollü bekleme (İstekler arasına insani nefes payı: 1.5 saniye)
+                time.sleep(1.5)
+                
             except: 
                 pass
                 
             ilerleme.progress((i + 1) / len(bist100_tam_liste))
         
-        # --- ASLA ÇÖKMEYEN GÜVENLİK KALKANI ---
+        # --- KİLİTLENMEYİ ÖNLEYEN KALKAN BLOKU ---
         if len(sonuclar) > 0:
             df_sonuc = pd.DataFrame(sonuclar)
             if "Hibrit Skor" in df_sonuc.columns:
@@ -803,11 +815,11 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
                 
             st.session_state.hibrit_tablo_full = df_sonuc
             df_sonuc.to_csv("son_tarama_kaydi.csv", index=False)
-            durum_m.success("✅ Canlı tarama başarıyla tamamlandı ve güncellendi!")
+            durum_m.success("✅ Emniyetli tarama başarıyla tamamlandı ve kaydedildi!")
         else:
-            durum_m.error("🚨 Yahoo Finance bağlantısı şu an kapalı (Ban Devam Ediyor). Hafızadaki/Kayıtlı en son başarılı tarama tablosu aşağıda listelenmiştir.")
+            durum_m.error("🚨 Yahoo Finance bağlantısı henüz açılmadı (Ban devam ediyor). Kayıtlı son başarılı tablo aşağıya getirilmiştir.")
 
-    # Sonuçların Tablo Halinde Gösterilmesi
+    # Arayüz Tablo Basım Motoru
     if 'hibrit_tablo_full' in st.session_state and not st.session_state.hibrit_tablo_full.empty:
         def renk_motoru(val):
             if val == "👑 ŞAMPİYON": return 'background-color: #FFD700; color: black; font-weight: bold;'
