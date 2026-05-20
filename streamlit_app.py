@@ -76,7 +76,18 @@ forex_assets = {
     "DXY (Dolar Endeksi)": "DX-Y.NYB",
     "DAX 40 (Almanya)": "^GDAXI",
     "ETH/USD": "ETH-USD",
-    "BTC/USD": "BTC-USD"
+    "BTC/USD": "BTC-USD",
+    # --- AMERİKA HİSSE DEVLERİ (NASDAQ & NYSE) ---
+    "NVDA",     # Nvidia (Yapay Zeka Öncüsü)
+    "TSLA",     # Tesla (Elektrikli Araç & Teknoloji)
+    "AAPL",     # Apple (Teknoloji & Donanım)
+    "MSFT",     # Microsoft (Yazılım & Bulut)
+    "AMZN",     # Amazon (E-Ticaret & Bulut)
+    "META",     # Meta / Facebook (Sosyal Medya)
+    "GOOGL",    # Alphabet / Google (Arama & Yapay Zeka)
+    "AMD",      # AMD (Çip Üreticisi)
+    "NFLX"    # Netflix (Medya / Yayıncılık)
+    
 }
 
 # =================================================================================
