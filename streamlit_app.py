@@ -1067,16 +1067,25 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             if not df_fx.empty and len(df_fx) > 25:
                 if isinstance(df_fx.columns, pd.MultiIndex): df_fx.columns = df_fx.columns.get_level_values(0)
                 df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
-
-                            # --- SÜTUN VE BOŞ VERİ KORUMA KALKANI ---
-            if 'df_fx' in locals() and not df_fx.empty and 'High' in df_fx.columns:
-                if isinstance(df_fx.columns, pd.MultiIndex): 
+                # --- GEÇMİŞ YANLIŞ YAPILARI TEMİZLEME VE TEKİL SÜTUN ZIRHI ---
+            if 'df_fx' in locals() and not df_fx.empty:
+                # Çok katmanlı (MultiIndex) yapıyı tamamen parçalayıp düzleştiriyoruz
+                if isinstance(df_fx.columns, pd.MultiIndex):
                     df_fx.columns = df_fx.columns.get_level_values(0)
+    
+                # Sütun isimlerini stringe çevirip temizliyoruz
                 df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
+    
+                # Eğer içerde birden fazla aynı isimde sütun kalırsa sadece ilkini alıp temiz seri yapıyoruz
+                if 'High' in df_fx.columns and 'Low' in df_fx.columns:
+                    high_series = df_fx['High'].iloc[:, 0] if isinstance(df_fx['High'], pd.DataFrame) else df_fx['High']
+                    low_series = df_fx['Low'].iloc[:, 0] if isinstance(df_fx['Low'], pd.DataFrame) else df_fx['Low']
+        
+                # Şimdi güvenle rolling işlemlerini yapabiliriz
+                    df_fx['box_ust'] = high_series.rolling(window=20).max()
+                    df_fx['box_alt'] = low_series.rolling(window=20).min()
                 
-                # Orijinal hesaplama satırların bu if kontrolünün içine (bir TAB sağa) giriyor:
-                df_fx['box_ust'] = df_fx['High'].rolling(window=20).max()
-                df_fx['box_alt'] = df_fx['Low'].rolling(window=20).min() # (Varsa bu alt satırı da içeri al)
+
 
                
                 
