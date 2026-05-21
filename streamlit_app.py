@@ -1065,44 +1065,31 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 continue
                 
             if not df_fx.empty and len(df_fx) > 25:
-                if isinstance(df_fx.columns, pd.MultiIndex): df_fx.columns = df_fx.columns.get_level_values(0)
-                df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
-                # --- GEÇMİŞ YANLIŞ YAPILARI TEMİZLEME VE TEKİL SÜTUN ZIRHI ---
-            if 'df_fx' in locals() and not df_fx.empty:
-                # Çok katmanlı (MultiIndex) yapıyı tamamen parçalayıp düzleştiriyoruz
-                if isinstance(df_fx.columns, pd.MultiIndex):
+                # --- YABANCI HİSSE & ENDEKS SÜTUN DÜZLEŞTİRME ZIRHI ---
+                if isinstance(df_fx.columns, pd.MultiIndex): 
                     df_fx.columns = df_fx.columns.get_level_values(0)
-    
-                # Sütun isimlerini stringe çevirip temizliyoruz
                 df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
-    
-                # Eğer içerde birden fazla aynı isimde sütun kalırsa sadece ilkini alıp temiz seri yapıyoruz
-                if 'High' in df_fx.columns and 'Low' in df_fx.columns:
-                    high_series = df_fx['High'].iloc[:, 0] if isinstance(df_fx['High'], pd.DataFrame) else df_fx['High']
-                    low_series = df_fx['Low'].iloc[:, 0] if isinstance(df_fx['Low'], pd.DataFrame) else df_fx['Low']
-        
-                # Şimdi güvenle rolling işlemlerini yapabiliriz
-                    df_fx['box_ust'] = high_series.rolling(window=20).max()
-                    df_fx['box_alt'] = low_series.rolling(window=20).min()
                 
-
-
-               
+                # Eğer temizliğe rağmen sütunlar DataFrame döndürürse sadece ilk sütunu seriye çevir
+                high_series = df_fx['High'].iloc[:, 0] if isinstance(df_fx['High'], pd.DataFrame) else df_fx['High']
+                low_series = df_fx['Low'].iloc[:, 0] if isinstance(df_fx['Low'], pd.DataFrame) else df_fx['Low']
+                close_series = df_fx['Close'].iloc[:, 0] if isinstance(df_fx['Close'], pd.DataFrame) else df_fx['Close']
+                open_series = df_fx['Open'].iloc[:, 0] if isinstance(df_fx['Open'], pd.DataFrame) else df_fx['Open']
                 
-                # 1. Kristal Box Hesaplamaları (Donchian) - TAMAMI KORUNDU
-                df_fx['box_ust'] = df_fx['High'].rolling(window=20).max()
-                df_fx['box_alt'] = df_fx['Low'].rolling(window=20).min()
+                # 1. Kristal Box Hesaplamaları (Donchian) - TAMAMI KORUNDU VE GÜVENLİ SERİLERE BAĞLANDI
+                df_fx['box_ust'] = high_series.rolling(window=20).max()
+                df_fx['box_alt'] = low_series.rolling(window=20).min()
                 df_fx['box_orta'] = (df_fx['box_ust'] + df_fx['box_alt']) / 2
                 
                 # 2. Native ATR & Teknik İndikatör Hesaplamaları - TAMAMI KORUNDU
-                high_low = df_fx['High'] - df_fx['Low']
-                high_close = (df_fx['High'] - df_fx['Close'].shift()).abs()
-                low_close = (df_fx['Low'] - df_fx['Close'].shift()).abs()
+                high_low = high_series - low_series
+                high_close = (high_series - close_series.shift()).abs()
+                low_close = (low_series - close_series.shift()).abs()
                 ranges = pd.concat([high_low, high_close, low_close], axis=1)
                 true_range = ranges.max(axis=1)
                 df_fx['ATR'] = true_range.ewm(alpha=1/14, adjust=False).mean()
                 
-                fx_delta = df_fx['Close'].diff()
+                fx_delta = close_series.diff()
                 fx_gain = fx_delta.clip(lower=0)
                 fx_loss = -fx_delta.clip(upper=0)
                 fx_avg_gain = fx_gain.ewm(com=13, adjust=False).mean()
@@ -1110,10 +1097,10 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 fx_rs = fx_avg_gain / fx_avg_loss
                 df_fx['RSI'] = 100 - (100 / (1 + fx_rs))
                 
-                df_fx['EMA21'] = df_fx['Close'].ewm(span=21, adjust=False).mean()
-                df_fx['EMA50'] = df_fx['Close'].ewm(span=50, adjust=False).mean()
+                df_fx['EMA21'] = close_series.ewm(span=21, adjust=False).mean()
+                df_fx['EMA50'] = close_series.ewm(span=50, adjust=False).mean()
                 
-                son_fiyat = float(df_fx['Close'].iloc[-1])
+                son_fiyat = float(close_series.iloc[-1])
                 atr_val = float(df_fx['ATR'].iloc[-1])
                 rsi_val = float(df_fx['RSI'].iloc[-1])
                 b_ust = float(df_fx['box_ust'].iloc[-2])
@@ -1122,20 +1109,27 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 ema50 = float(df_fx['EMA50'].iloc[-1])
                 
                 # 3. PRICE ACTION SINIFLANDIRICI KATMANI - TAMAMI KORUNDU
-                son_mum = df_fx.iloc[-1]
-                onceki_mum = df_fx.iloc[-2]
+                son_mum_high = high_series.iloc[-1]
+                son_mum_low = low_series.iloc[-1]
+                son_mum_open = open_series.iloc[-1]
+                son_mum_close = close_series.iloc[-1]
                 
-                mum_boyu = son_mum['High'] - son_mum['Low']
-                alt_fitil = min(son_mum['Open'], son_mum['Close']) - son_mum['Low']
-                ust_fitil = son_mum['High'] - max(son_mum['Open'], son_mum['Close'])
+                onceki_mum_high = high_series.iloc[-2]
+                onceki_mum_low = low_series.iloc[-2]
+                onceki_mum_open = open_series.iloc[-2]
+                onceki_mum_close = close_series.iloc[-2]
+                
+                mum_boyu = son_mum_high - son_mum_low
+                alt_fitil = min(son_mum_open, son_mum_close) - son_mum_low
+                ust_fitil = son_mum_high - max(son_mum_open, son_mum_close)
                 
                 is_bullish_pin = (alt_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False
                 is_bearish_pin = (ust_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False
-                is_bullish_engulfing = (onceki_mum['Close'] < onceki_mum['Open']) and (son_mum['Close'] > son_mum['Open']) and (son_mum['Close'] > onceki_mum['Open'])
-                is_bearish_engulfing = (onceki_mum['Close'] > onceki_mum['Open']) and (son_mum['Close'] < son_mum['Open']) and (son_mum['Close'] < onceki_mum['Open'])
+                is_bullish_engulfing = (onceki_mum_close < onceki_mum_open) and (son_mum_close > son_mum_open) and (son_mum_close > onceki_mum_open)
+                is_bearish_engulfing = (onceki_mum_close > onceki_mum_open) and (son_mum_close < son_mum_open) and (son_mum_close < onceki_mum_open)
                 
-                son_ekstrem_zirve = df_fx['High'].tail(15).iloc[:-1].max()
-                son_ekstrem_dip = df_fx['Low'].tail(15).iloc[:-1].min()
+                son_ekstrem_zirve = high_series.tail(15).iloc[:-1].max()
+                son_ekstrem_dip = low_series.tail(15).iloc[:-1].min()
                 is_msb_bullish = son_fiyat > son_ekstrem_zirve
                 is_msb_bearish = son_fiyat < son_ekstrem_dip
 
@@ -1278,7 +1272,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                     with sag_p:
                         st.markdown("### 📈 Çift Yönlü Grafik ve Hedef Haritası")
                         fig_fx = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.7, 0.3])
-                        fig_fx.add_trace(go.Candlestick(x=df_fx.index, open=df_fx['Open'], high=df_fx['High'], low=df_fx['Low'], close=df_fx['Close'], name="Fiyat"), row=1, col=1)
+                        fig_fx.add_trace(go.Candlestick(x=df_fx.index, open=open_series, high=high_series, low=low_series, close=close_series, name="Fiyat"), row=1, col=1)
                         fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_ust'], line=dict(color='#8E44AD', width=1.5, dash='dash'), name="Box Üst Tavan"), row=1, col=1)
                         fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_alt'], line=dict(color='#8E44AD', width=1.5, dash='dash'), name="Box Alt Taban"), row=1, col=1)
                         fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA21'], line=dict(color='#E67E22', width=1.2), name="EMA 21"), row=1, col=1)
