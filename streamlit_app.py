@@ -1068,11 +1068,17 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 if isinstance(df_fx.columns, pd.MultiIndex): df_fx.columns = df_fx.columns.get_level_values(0)
                 df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
 
-                # Satırların başındaki boşlukların (girintilerin) birbiriyle BİREBİR AYNI hizada olmasına dikkat et:
+                            # --- SÜTUN VE BOŞ VERİ KORUMA KALKANI ---
+            if 'df_fx' in locals() and not df_fx.empty and 'High' in df_fx.columns:
                 if isinstance(df_fx.columns, pd.MultiIndex): 
                     df_fx.columns = df_fx.columns.get_level_values(0)
                 df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
+                
+                # Orijinal hesaplama satırların bu if kontrolünün içine (bir TAB sağa) giriyor:
                 df_fx['box_ust'] = df_fx['High'].rolling(window=20).max()
+                df_fx['box_alt'] = df_fx['Low'].rolling(window=20).min() # (Varsa bu alt satırı da içeri al)
+
+               
                 
                 # 1. Kristal Box Hesaplamaları (Donchian) - TAMAMI KORUNDU
                 df_fx['box_ust'] = df_fx['High'].rolling(window=20).max()
