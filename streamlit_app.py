@@ -1251,15 +1251,19 @@ elif calisma_modu == "Çekirdek 4: Ultra FXMatik (Quant Matrix)":
             fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 1.0 * x_idx), line=dict(color='#3498DB', width=1.5), name="Gann 1x1 (Denge Akışı)"), row=1, col=1)
             fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 0.5 * x_idx), line=dict(color='#1ABC9C', width=1, dash='dash'), name="Gann 1x2 (Yavaş Trend)"), row=1, col=1)
 
-            # Dinamik Kâr Al ve Stop Çizgilerinin Grafik Sağ Ucunda Gösterilmesi
+
+                        # Dinamik Kâr Al ve Stop Çizgilerinin Grafik Sağ Ucunda Gösterilmesi
             if "KIRILDI" in durum_text or "RİSKİ" in durum_text:
                 c_x = [df_m.index[-15], df_m.index[-1]]
                 fig_ultra.add_trace(go.Scatter(x=c_x, y=[tp_hedef, tp_hedef], line=dict(color='#2ECC71', width=3), name="Dinamik TP"), row=1, col=1)
                 fig_ultra.add_trace(go.Scatter(x=c_x, y=[sl_stop, sl_stop], line=dict(color='#D50000', width=3), name="Dinamik SL"), row=1, col=1)
 
             # Alt İndikatör Paneli (RSI ve Momentum Referansı)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=df_m['Close'].rsi_m := [rsi_fx]*len(df_m), line=dict(color='#16A085', width=1.5), name="RSI (14)"), row=2, col=1)
+            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=[rsi_fx]*len(df_m), line=dict(color='#16A085', width=1.5), name="RSI (14)"), row=2, col=1)
             fig_ultra.add_shape(type="line", x0=df_m.index[0], y0=50, x1=df_m.index[-1], y1=50, line=dict(color="gray", dash="dash"), row=2, col=1)
+            
+            fig_ultra.update_layout(
+
             
             fig_ultra.update_layout(
                 height=650,
