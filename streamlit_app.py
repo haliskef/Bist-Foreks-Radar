@@ -858,15 +858,17 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 if isinstance(df_fx.columns, pd.MultiIndex): 
                     df_fx.columns = df_fx.columns.get_level_values(0)
                 df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
+
+                # --- ÇOK KATMANLI VERİ YAPISINI (USA/FOREX) KESİN DÜZLEŞTİRME KORUMASI ---
+                if isinstance(df_fx.columns, pd.MultiIndex): 
+                    df_fx.columns = df_fx.columns.get_level_values(0)
+                df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
                 
-                df_fx['Open'] = df_fx['Open'].iloc[:, 0] if isinstance(df_fx['Open'], pd.DataFrame) else df_fx['Open']
-                df_fx['High'] = df_fx['High'].iloc[:, 0] if isinstance(df_fx['High'], pd.DataFrame) else df_fx['High']
-                df_fx['Low'] = df_fx['Low'].iloc[:, 0] if isinstance(df_fx['Low'].iloc[:, 0], pd.DataFrame) else df_fx['Low']
-                df_fx['Close'] = df_fx['Close'].iloc[:, 0] if isinstance(df_fx['Close'], pd.DataFrame) else df_fx['Close']
-                
-                # 1. DİNAMİK/YÜRÜYEN SEVİYELER (MOMENTUM)
-                df_fx['Direnç_S1'] = df_fx['High'].rolling(window=15).max().shift(1)
-                df_fx['Destek_D1'] = df_fx['Low'].rolling(window=15).min().shift(1)
+                # Sütunların tekil seriler haline getirilmesi (IndexingError Vermeyen Güvenli Sürüm)
+                df_fx['Open'] = df_fx['Open'].iloc[:, 0] if isinstance(df_fx['Open'], pd.DataFrame) or (df_fx['Open'].ndim > 1) else df_fx['Open']
+                df_fx['High'] = df_fx['High'].iloc[:, 0] if isinstance(df_fx['High'], pd.DataFrame) or (df_fx['High'].ndim > 1) else df_fx['High']
+                df_fx['Low'] = df_fx['Low'].iloc[:, 0] if isinstance(df_fx['Low'], pd.DataFrame) or (df_fx['Low'].ndim > 1) else df_fx['Low']
+                df_fx['Close'] = df_fx['Close'].iloc[:, 0] if isinstance(df_fx['Close'], pd.DataFrame) or (df_fx['Close'].ndim > 1) else df_fx['Close']
                 
                 # 🏛️ 2. YENİ EK: ASIL SABİT PSİKOLOJİK KALELER (Geniş Zamanlı Klasik Pivot Formülleri)
                 # Son 24 saatlik/barlık blok verilerinden sabit ana hatları çıkarır
