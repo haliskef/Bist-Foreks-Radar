@@ -56,7 +56,7 @@ with st.sidebar:
     calisma_modu = st.sidebar.radio("Sistemi Seçin:", [
         "Lazer (Detaylı Analiz & Strateji)", 
         "Radar (BIST 100 Full Hibrit Tarama)",
-        "Forex & Küresel Piyasalar (Çift Yönlü)"
+        "Forex & Küresel Piyasalar (Çift Yönlü)",
         "Ultra FXMatik (Quant Matrix)"
     ])
     st.markdown("---")
