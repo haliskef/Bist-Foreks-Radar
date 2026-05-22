@@ -700,7 +700,7 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
 # =================================================================================
 # =================================================================================
 # =================================================================================
-# ÇEKİRDEK 2: FULL HİBRİT RADAR
+# ÇEKİRDEK 2: FULL HİBRİT RADAR (HATASIZ VE SAF PANDAS HESAPLAMALI YENİ SÜRÜM)
 # =================================================================================
 elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
     st.markdown("## 📡 BIST 100 DERİN HİBRİT TARAMA (TEKNİK + TEMEL)")
@@ -727,40 +727,79 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
         ilerleme = st.progress(0)
         durum_m = st.empty()
         sonuclar = []
+        
         for i, kod in enumerate(bist100_tam_liste):
             durum_m.text(f"⏳ Analiz Ediliyor: {kod} ({i+1}/{len(bist100_tam_liste)})")
             try:
                 t = yf.Ticker(kod)
                 hist = t.history(period="6mo", interval="1d")
-                inf = t.info
-                if hist.empty: continue
+                
+                # Sütun yapısı düzleştirme koruması
+                if isinstance(hist.columns, pd.MultiIndex):
+                    hist.columns = hist.columns.get_level_values(0)
+                hist.columns = [str(c).strip().capitalize() for c in hist.columns]
+                
+                if hist.empty or len(hist) < 22: 
+                    continue
+                
+                # Güvenli tekil seriye indirgeme (hata vermez kalıp)
+                if hasattr(hist['Close'], 'columns') or (type(hist['Close']).__name__ == 'DataFrame'): hist['Close'] = hist['Close'].iloc[:, 0]
+                
                 skor = 0
-                son_fiyat = hist['Close'].iloc[-1].item()
-                ema21 = ta.ema(hist['Close'], length=21).iloc[-1].item()
-                rsi = ta.rsi(hist['Close'], length=14).iloc[-1].item()
-                if son_fiyat > ema21: skor += 1
-                if 30 < rsi < 65: skor += 1
+                son_fiyat = float(hist['Close'].iloc[-1])
+                
+                # 🛠️ NATIVE EMA21 HESAPLAMASI (Kütüphane bağımlılığı olmadan)
+                hist['EMA21'] = hist['Close'].ewm(span=21, adjust=False).mean()
+                ema21_val = float(hist['EMA21'].iloc[-1])
+                
+                # 🛠️ NATIVE RSI14 HESAPLAMASI (Kütüphane bağımlılığı olmadan)
+                delta = hist['Close'].diff()
+                gain = delta.clip(lower=0)
+                loss = -delta.clip(upper=0)
+                avg_gain = gain.ewm(com=13, adjust=False).mean()
+                avg_loss = loss.ewm(com=13, adjust=False).mean()
+                rs = avg_gain / avg_loss
+                hist['RSI'] = 100 - (100 / (1 + rs))
+                rsi_val = float(hist['RSI'].iloc[-1])
+                
+                # Temel Verileri Güvenli Çekme Katmanı
+                inf = t.info
                 fk = inf.get('trailingPE', 100)
-                if fk < 15: skor += 1
                 pddd = inf.get('priceToBook', 100)
-                if pddd < 3: skor += 1
                 roe = inf.get('returnOnEquity', 0)
+                
+                # Skorlama Motoru Kontrolleri
+                if son_fiyat > ema21_val: skor += 1
+                if 30 < rsi_val < 65: skor += 1
+                if fk is not None and fk < 15: skor += 1
+                if pddd is not None and pddd < 3: skor += 1
                 if roe is not None and roe > 0.20: skor += 1
 
                 sonuclar.append({
-                    "Hisse": kod.replace(".IS", ""), "Fiyat": round(son_fiyat, 2),
-                    "F/K": round(fk, 2) if fk != 100 else "N/A", "PD/DD": round(pddd, 2) if pddd != 100 else "N/A",
-                    "ROE (%)": round(roe*100, 2) if roe else "N/A", "RSI": round(rsi, 2), "Hibrit Skor": skor,
+                    "Hisse": kod.replace(".IS", ""), 
+                    "Fiyat": round(son_fiyat, 2),
+                    "F/K": round(fk, 2) if (fk is not None and fk != 100) else "N/A", 
+                    "PD/DD": round(pddd, 2) if (pddd is not None and pddd != 100) else "N/A",
+                    "ROE (%)": round(roe * 100, 2) if roe else "N/A", 
+                    "RSI": round(rsi_val, 2), 
+                    "Hibrit Skor": skor,
                     "Sistem Notu": "👑 ŞAMPİYON" if skor >= 4 else ("🟢 GÜÇLÜ" if skor == 3 else ("🟡 MAKUL" if skor == 2 else "⚪ İZLE"))
                 })
-                time.sleep(0.1)
-            except: pass
+                time.sleep(0.05)
+            except Exception as e: 
+                pass # Hata veren hisseyi atla, döngüyü bozma
+                
             ilerleme.progress((i + 1) / len(bist100_tam_liste))
-        df_sonuc = pd.DataFrame(sonuclar).sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True)
-        st.session_state.hibrit_tablo_full = df_sonuc
-        df_sonuc.to_csv("son_tarama_kaydi.csv", index=False)
-        durum_m.success("✅ Kaydedildi!")
+            
+        if sonuclar:
+            df_sonuc = pd.DataFrame(sonuclar).sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True)
+            st.session_state.hibrit_tablo_full = df_sonuc
+            df_sonuc.to_csv("son_tarama_kaydi.csv", index=False)
+            durum_m.success("✅ Tüm BIST 100 Başarıyla Taranıp Kaydedildi!")
+        else:
+            durum_m.error("❌ Tarama sırasında veri çekilemedi.")
 
+    # Tabloyu Ekrana Basma Bölümü
     if not st.session_state.hibrit_tablo_full.empty:
         def renk_motoru(val):
             if val == "👑 ŞAMPİYON": return 'background-color: #FFD700; color: black; font-weight: bold;'
