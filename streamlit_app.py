@@ -1096,10 +1096,11 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             st.dataframe(df_sonuc, use_container_width=True)
 
 
+# ================================================================================= 
 # =================================================================================
-# ÇEKİRDEK 4: ULTRA FXMATİK (QUANT MATRIX) - KRİSTAL KUTU, GANN TAYFI VE VOLATİLİTE MOTORU
+# ÇEKİRDEK 4: ULTRA FXMATİK (QUANT MATRIX) - DİNAMİK RENKLİ VE PARLAK KANAL MOTORU
 # =================================================================================
-elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
+elif calisma_modu == "Çekirdek 4: Ultra FXMatik (Quant Matrix)":
     st.markdown("## 🦅 ULTRA FXMATİK (QUANT MATRIX COMPASS)")
     st.markdown("---")
     
@@ -1129,6 +1130,7 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
             "DAX 40 (Almanya)": "^GDAXI",
             "ETH/USD": "ETH-USD",
             "BTC/USD": "BTC-USD"
+
         }
         
         fx_secilen = st.selectbox("ANALİZ EDİLECEK ENSTRÜMAN", list(makro_evren.keys()), index=0)
@@ -1157,7 +1159,6 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
                 if hasattr(df_raw[col], 'columns') or (type(df_raw[col]).__name__ == 'DataFrame'):
                     df_raw[col] = df_raw[col].iloc[:, 0]
             
-            # Seçilen bar uzunluğuna göre matrisi kesme
             df_m = df_raw.tail(kutu_bar_boyu).copy()
             
             son_fiyat = float(df_m['Close'].iloc[-1])
@@ -1166,8 +1167,7 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
             kutu_merkez = (kutu_tavan + kutu_taban) / 2
             kutu_boyutu = kutu_tavan - kutu_taban
             
-            # 📐 1. KATMAN: ATR (AVERAGE TRUE RANGE) TABANLI VOLATİLİTE HESABI
-            # FxMatik'ten daha iyi olmasını sağlayan dinamik gürültü filtresi
+            # 📐 1. KATMAN: ATR VOLATİLİTE VE KANAL DARLIK KONTROLÜ
             high_low = df_m['High'] - df_m['Low']
             high_close = np.abs(df_m['High'] - df_m['Close'].shift())
             low_close = np.abs(df_m['Low'] - df_m['Close'].shift())
@@ -1175,50 +1175,67 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
             true_range = ranges.max(axis=1)
             atr_val = float(true_range.ewm(span=14, adjust=False).mean().iloc[-1])
             
-            # 📐 2. KATMAN: GANN TAYFI GEOMETRİSİ VE TREND HIZ SKORU
+            # Kanal darlık tespiti (Kutu boyutu, fiyat adımına göre darsa fosforlu renk tetiklenecek)
+            oransal_genislik = (kutu_boyutu / kutu_merkez) * 100
+            is_dar_kanal = oransal_genislik < 1.5  # %1.5'tan küçükse dar sıkışma kabul edilir
+            
+            # 📐 2. KATMAN: GANN TAYFI GEOMETRİSİ
             x_idx = np.arange(len(df_m))
             fiyat_adim_katsayisi = kutu_boyutu / len(df_m)
-            
-            # İdeal Gann Dengesi (1x1) Çizgisinin son değeri
             gann_1x1_son = kutu_taban + (fiyat_adim_katsayisi * 1.0 * x_idx[-1])
             gann_2x1_son = kutu_taban + (fiyat_adim_katsayisi * 2.0 * x_idx[-1])
             
-            # Hız Skoru Hesaplama
             hiz_skoru = "DENGELİ"
             if son_fiyat > gann_2x1_son: hiz_skoru = "AŞIRI HIZLI BOĞA"
             elif son_fiyat > gann_1x1_son: hiz_skoru = "POZİTİF İVME"
             else: hiz_skoru = "NEGATİF BASKI"
 
-            # 📐 3. KATMAN: RSI VE YALANCI KIRILIM (FAKEOUT) KONTROLÜ
+            # 📐 3. KATMAN: RSI VE SİNYAL KOMBİNASYONU
             diff = df_m['Close'].diff()
             rsi_fx = float(100 - (100 / (1 + (diff.clip(lower=0).ewm(com=13, adjust=False).mean() / (-diff.clip(upper=0)).ewm(com=13, adjust=False).mean()))).iloc[-1])
 
-            # Durum Sinyali Belirleme Matrixi
+            # Duruma göre dinamik renk ve görsel kalınlık parametreleri
             if son_fiyat >= kutu_tavan:
                 if rsi_fx > 52:
                     durum_text = "🚀 KRİSTAL KUTU YUKARI KIRILDI (GÜÇLÜ BOĞA SİNYALİ)"
-                    kart_renk = "#2ECC71"
-                    tp_hedef = son_fiyat + (atr_val * 3.5)  # Volatiliteye göre dinamik TP
-                    sl_stop = kutu_tavan - (atr_val * 1.5)   # Volatiliteye göre dinamik SL
+                    kart_renk = "#2ECC71"  # Canlı Yeşil
+                    kanal_grafik_rengi = "#2ECC71"
+                    kanal_kalinligi = 4
+                    tp_hedef = son_fiyat + (atr_val * 3.5)
+                    sl_stop = kutu_tavan - (atr_val * 1.5)
                 else:
                     durum_text = "⚠️ YALANCI KIRILIM RİSKİ (RSI ZAYIF, KUTU ÜSTÜ TUZAK)"
-                    kart_renk = "#9B59B6"
+                    kart_renk = "#9B59B6"  # Tuzak Moru
+                    kanal_grafik_rengi = "#9B59B6"
+                    kanal_kalinligi = 2.5
                     tp_hedef = kutu_merkez
                     sl_stop = kutu_tavan + atr_val
             elif son_fiyat <= kutu_taban:
                 if rsi_fx < 48:
                     durum_text = "💥 KRİSTAL KUTU AŞAĞI KIRILDI (GÜÇLÜ AYI SİNYALİ)"
-                    kart_renk = "#E74C3C"
+                    kart_renk = "#E74C3C"  # Canlı Kırmızı
+                    kanal_grafik_rengi = "#E74C3C"
+                    kanal_kalinligi = 4
                     tp_hedef = son_fiyat - (atr_val * 3.5)
                     sl_stop = kutu_taban + (atr_val * 1.5)
                 else:
                     durum_text = "⚠️ YALANCI KIRILIM RİSKİ (RSI UYUMSUZ, KUTU ALTI TUZAK)"
                     kart_renk = "#9B59B6"
+                    kanal_grafik_rengi = "#9B59B6"
+                    kanal_kalinligi = 2.5
                     tp_hedef = kutu_merkez
                     sl_stop = kutu_taban - atr_val
             else:
-                durum_text = "⏳ KUTU İÇİ HACİM SIKIŞMASI (AKÜMÜLASYON SEYRİ)"
-                kart_renk = "#F39C12"
+                if is_dar_kanal:
+                    durum_text = "⚡ SÜPER DAR KANAL SIKIŞMASI (PATLAMA YAKIN!)"
+                    kart_renk = "#F1C40F"  # Fosforlu Sarı/Turuncu kırılım öncesi
+                    kanal_grafik_rengi = "#F39C12"
+                    kanal_kalinligi = 4.5  # Dikkat çeksin diye çok kalın
+                else:
+                    durum_text = "⏳ KUTU İÇİ HACİM SIKIŞMASI (AKÜMÜLASYON SEYRİ)"
+                    kart_renk = "#34495E"  # Sakin Gri-Mavi
+                    kanal_grafik_rengi = "#7F8C8D"
+                    kanal_kalinligi = 2.5
                 tp_hedef = kutu_tavan
                 sl_stop = kutu_taban
 
@@ -1230,38 +1247,47 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
             m1.metric("GÜNCEL FİYAT", f"{son_fiyat:.4f}")
             m2.metric("📦 KUTU TAVANI (DİRENÇ)", f"{kutu_tavan:.4f}")
             m3.metric("📦 KUTU TABANI (DESTEK)", f"{kutu_taban:.4f}")
-            m4.metric("📊 TREND HIZ SKORU", hiz_skoru)
+            m4.metric("📊 KANAL YAPISI", "DAR KANAL (ALARM)" if is_dar_kanal else "NORMAL KORİDOR")
 
-            # 📈 MULTI-MATRIX PLOTLY GRAPH
-            fig_ultra = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.8, 0.2])
+            # 📈 Gelişmiş Plotly Çizim Alanı
+            fig_ultra = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.78, 0.22])
             
-            # Mumlar
+            # Mum Grafik Konturu
             fig_ultra.add_trace(go.Candlestick(
                 x=df_m.index, open=df_m['Open'], high=df_m['High'], low=df_m['Low'], close=df_m['Close'],
                 name=fx_secilen, increasing_line_color='#2ECC71', decreasing_line_color='#E74C3C'
             ), row=1, col=1)
             
-            # Kristal Kutu Koridoru
-            fig_ultra.add_trace(go.Scatter(x=[df_m.index[0], df_m.index[-1]], y=[kutu_tavan, kutu_tavan], line=dict(color='#E74C3C', width=2.5), name="Kutu Tavanı (Direnç)"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=[df_m.index[0], df_m.index[-1]], y=[kutu_taban, kutu_taban], line=dict(color='#2ECC71', width=2.5), name="Kutu Tabanı (Destek)"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=[df_m.index[0], df_m.index[-1]], y=[kutu_merkez, kutu_merkez], line=dict(color='#7F8C8D', width=1.5, dash='dot'), name="Denge Ekseni"), row=1, col=1)
+            # Duruma ve Darlığa Göre Renklenen Kristal Kutu Hatları
+            fig_ultra.add_trace(go.Scatter(x=[df_m.index[0], df_m.index[-1]], y=[kutu_tavan, kutu_tavan], line=dict(color=kanal_grafik_rengi, width=kanal_kalinligi), name="Kutu Direnç Sınırı"), row=1, col=1)
+            fig_ultra.add_trace(go.Scatter(x=[df_m.index[0], df_m.index[-1]], y=[kutu_taban, kutu_taban], line=dict(color=kanal_grafik_rengi, width=kanal_kalinligi), name="Kutu Destek Sınırı"), row=1, col=1)
+            fig_ultra.add_trace(go.Scatter(x=[df_m.index[0], df_m.index[-1]], y=[kutu_merkez, kutu_merkez], line=dict(color='#7F8C8D', width=1, dash='dot'), name="Merkez Denge Ekseni"), row=1, col=1)
 
-            # Gann Tayfı Eğrileri (Kutunun Sol Altından Başlayan Işınlar)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 2.0 * x_idx), line=dict(color='#9B59B6', width=1, dash='dash'), name="Gann 2x1 (Hızlı Trend)"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 1.0 * x_idx), line=dict(color='#3498DB', width=1.5), name="Gann 1x1 (Denge Akışı)"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 0.5 * x_idx), line=dict(color='#1ABC9C', width=1, dash='dash'), name="Gann 1x2 (Yavaş Trend)"), row=1, col=1)
+            # Gann Tayfı Geometrisi
+            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 2.0 * x_idx), line=dict(color='#9B59B6', width=1, dash='dash'), name="Gann 2x1 (İvme)"), row=1, col=1)
+            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 1.0 * x_idx), line=dict(color='#3498DB', width=1.5), name="Gann 1x1 (Ana Denge)"), row=1, col=1)
+            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 0.5 * x_idx), line=dict(color='#1ABC9C', width=1, dash='dash'), name="Gann 1x2 (Yavaş)"), row=1, col=1)
 
+            # Duruma Göre Sağ Uca Fırlayan Dinamik Çıkış (TP/SL) Çizgileri
+            c_x = [df_m.index[-15], df_m.index[-1]]
+            
+            if "GÜÇLÜ BOĞA" in durum_text:
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[tp_hedef, tp_hedef], line=dict(color='#2ECC71', width=3.5, dash='solid'), name="Hedef (TP)"), row=1, col=1)
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[sl_stop, sl_stop], line=dict(color='#D50000', width=3.5, dash='solid'), name="Zarar Kes (SL)"), row=1, col=1)
+            elif "GÜÇLÜ AYI" in durum_text:
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[tp_hedef, tp_hedef], line=dict(color='#2ECC71', width=3.5, dash='solid'), name="Hedef (TP)"), row=1, col=1)
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[sl_stop, sl_stop], line=dict(color='#D50000', width=3.5, dash='solid'), name="Zarar Kes (SL)"), row=1, col=1)
+            elif "YALANCI KIRILIM" in durum_text:
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[tp_hedef, tp_hedef], line=dict(color='#9B59B6', width=2.5, dash='dot'), name="Tuzak Dönüş Hedefi"), row=1, col=1)
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[sl_stop, sl_stop], line=dict(color='#7F8C8D', width=2.5, dash='dash'), name="Tuzak Risk Limiti"), row=1, col=1)
+            else:
+                # Kutu içi beklemelerde ince tetik çizgileri sağ uca uzanır
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[kutu_tavan, kutu_tavan], line=dict(color='#E74C3C', width=1.5, dash='dot'), name="Yukarı Tetik Hattı"), row=1, col=1)
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[kutu_taban, kutu_taban], line=dict(color='#2ECC71', width=1.5, dash='dot'), name="Aşağı Tetik Hattı"), row=1, col=1)
 
-                        # Dinamik Kâr Al ve Stop Çizgilerinin Grafik Sağ Ucunda Gösterilmesi
-            if "KIRILDI" in durum_text or "RİSKİ" in durum_text:
-                c_x = [df_m.index[-15], df_m.index[-1]]
-                fig_ultra.add_trace(go.Scatter(x=c_x, y=[tp_hedef, tp_hedef], line=dict(color='#2ECC71', width=3), name="Dinamik TP"), row=1, col=1)
-                fig_ultra.add_trace(go.Scatter(x=c_x, y=[sl_stop, sl_stop], line=dict(color='#D50000', width=3), name="Dinamik SL"), row=1, col=1)
-
-            # Alt İndikatör Paneli (RSI ve Momentum Referansı)
+            # Alt İndikatör Paneli (Hatasız RSI Çizimi)
             fig_ultra.add_trace(go.Scatter(x=df_m.index, y=[rsi_fx]*len(df_m), line=dict(color='#16A085', width=1.5), name="RSI (14)"), row=2, col=1)
             fig_ultra.add_shape(type="line", x0=df_m.index[0], y0=50, x1=df_m.index[-1], y1=50, line=dict(color="gray", dash="dash"), row=2, col=1)
-            
             
             fig_ultra.update_layout(
                 height=650,
@@ -1272,26 +1298,22 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
             )
             st.plotly_chart(fig_ultra, use_container_width=True)
 
-            # 🎯 QUANT HARİTASI VE STRATEJİ KARTI
-            st.markdown("### 🏹 STRATEJİK HEDEF MATRİSİ")
+            # 🎯 STRATEJİK HEDEF MATRİSİ CARD ALANI
+            st.markdown("### 🏹 QUANT STRATEJİ KARTI")
             s1, s2, s3 = st.columns(3)
             
-            if "YUKARI" in durum_text:
-                s1.success(f"🎯 **Kâr Al (TP) Hedefi:** {tp_hedef:.4f}")
-                s2.error(f"🛑 **Zarar Kes (SL) Sınırı:** {sl_stop:.4f}")
-                s3.info(f"⚖️ **Ödül / Risk Oranı:** {abs(tp_hedef-son_fiyat)/abs(son_fiyat-sl_stop):.2f}")
-            elif "AŞAĞI" in durum_text:
-                s1.success(f"🎯 **Kâr Al (TP) Hedefi:** {tp_hedef:.4f}")
-                s2.error(f"🛑 **Zarar Kes (SL) Sınırı:** {sl_stop:.4f}")
-                s3.info(f"⚖️ **Ödül / Risk Oranı:** {abs(son_fiyat-tp_hedef)/abs(sl_stop-son_fiyat):.2f}")
-            elif "RİSKİ" in durum_text:
-                s1.warning("⚡ Pozisyona girmek riskli!")
-                s2.info(f"🔄 Kutu içine dönüş hedefi: {tp_hedef:.4f}")
-                s3.write("Sistem ayı/boğa tuzağı algıladı.")
+            if "GÜÇLÜ BOĞA" in durum_text or "GÜÇLÜ AYI" in durum_text:
+                s1.success(f"🎯 **Kâr Al (TP) Seviyesi:** {tp_hedef:.4f}")
+                s2.error(f"🛑 **Zarar Kes (SL) Seviyesi:** {sl_stop:.4f}")
+                s3.info(f"⚖️ **Trend İvme Skoru:** {hiz_skoru}")
+            elif "YALANCI KIRILIM" in durum_text:
+                s1.warning("⚠️ İşleme Girme! (Tuzak Aktif)")
+                s2.info(f"🔄 Kutu İçi Geri Çekilme Hedefi: {tp_hedef:.4f}")
+                s3.write(f"RSI Seviyesi: {rsi_fx:.1f}")
             else:
-                s1.info(f"🟢 Üst Sınır Aşılırsa Alış Tetiklenir: {kutu_tavan:.4f}")
-                s2.info(f"🔴 Alt Sınır Kırılırsa Satış Tetiklenir: {kutu_taban:.4f}")
-                s3.write(f"📦 Kutu Genişliği: {kutu_boyutu:.4f}")
+                s1.info(f"⚡ Üst Sınır Geçilirse (AL): {kutu_tavan:.4f}")
+                s2.info(f"⚡ Alt Sınır Patlarsa (SAT): {kutu_taban:.4f}")
+                s3.write(f"📦 Kutu Genişlik Oranı: %{oransal_genislik:.2f}")
                 
     except Exception as e:
-        st.warning("Veriler işlenirken anlık bir sunucu gecikmesi yaşandı. Lütfen saniyeler sonra sayfayı yenileyin.")
+        st.warning("Veriler işlenirken anlık bir senkronizasyon gecikmesi oldu. Grafik güncelleniyor...")
