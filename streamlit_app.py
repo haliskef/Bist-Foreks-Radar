@@ -1262,8 +1262,6 @@ elif calisma_modu == "Çekirdek 4: Ultra FXMatik (Quant Matrix)":
             fig_ultra.add_trace(go.Scatter(x=df_m.index, y=[rsi_fx]*len(df_m), line=dict(color='#16A085', width=1.5), name="RSI (14)"), row=2, col=1)
             fig_ultra.add_shape(type="line", x0=df_m.index[0], y0=50, x1=df_m.index[-1], y1=50, line=dict(color="gray", dash="dash"), row=2, col=1)
             
-            fig_ultra.update_layout(
-
             
             fig_ultra.update_layout(
                 height=650,
