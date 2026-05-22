@@ -1332,4 +1332,4 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
                 s3.write(f"📦 Kutu Genişlik Oranı: %{oransal_genislik:.2f}")
                 
     except Exception as e:
-        st.warning("Veriler işlenirken anlık bir senkronizasyon gecikmesi oldu.
+        st.warning("Veriler işlenirken anlık bir senkronizasyon gecikmesi oldu...")
