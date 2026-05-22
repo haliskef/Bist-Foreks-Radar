@@ -771,10 +771,10 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 
 # =================================================================================
 # =================================================================================
-# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (TAM OTONOM ÇOKLU RADAR - ASIL SABİT DESTEK/DİRENÇLİ)
+# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (TAM OTONOM ÇOKLU ENSTRÜMAN RADARI - GÜVENLİ VE DESTEK/DİRENÇLİ)
 # =================================================================================
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
-    st_autorefresh(interval=60000, key="global_forex_multi_scan_v15_asıl_seviyeler")
+    st_autorefresh(interval=60000, key="global_forex_multi_scan_v14_final_fix")
     st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ (TÜM LİSTE ARKA PLANDA TARANIYOR)")
     
     # -----------------------------------------------------------------------------
@@ -784,6 +784,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
     TELEGRAM_CHAT_ID = "1338802399"
 
     def telegram_sinyal_gonder(mesaj):
+        """Kırılım anında Telegram üzerinden anlık bildirim atar."""
         if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
             try:
                 import requests
@@ -793,12 +794,12 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             except Exception as e:
                 pass 
 
-    # SEKMELİ YAPI
+    # SEKMELİ YAPI (Grafik Paneli ve Geniş Haber Paneli Ayrımı)
     fx_tab1, fx_tab2 = st.tabs(["📊 Otonom Teknik Analiz & PA", "📅 Canlı Ekonomik Takvim & Makro Etki"])
     
     with fx_tab2:
         st.markdown("### 📰 Küresel Makroekonomik Takvim (Maksimum Genişlik & Türkçe)")
-        st.warning("⚠️ **Volatilite Uyarısı:** Yüksek etkili (3 Yıldızlı / Kırmızı) verilerin açıklanma saatlerinde teknik indikatörler devredışı kalabilir.")
+        st.warning("⚠️ **Volatilite Uyarısı:** Yüksek etkili (3 Yıldızlı / Kırmızı) verilerin açıklanma saatlerinde teknik indikatörler devredışı kalabilir. Haber saatinden 15 dk önce ve sonra işlem riskini minimuma indirin.")
         
         ekonomik_takvim_html = """
         <div style="position: relative; width: 100%; margin: 0; padding: 0;">
@@ -825,24 +826,29 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
         st.components.v1.html(ekonomik_takvim_html, height=950, scrolling=True)
         
     with fx_tab1:
+        # Sabit Test Butonu
         if st.button("🚀 Sistem Bildirim Testini Tetikle"):
             try:
                 import requests
                 url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-                payload = {"chat_id": TELEGRAM_CHAT_ID, "text": "🎯 *SİSTEM TESTİ BAŞARILI!*\n\nAsıl Sabit Destek/Direnç modülü devrededir.", "parse_mode": "Markdown"}
+                payload = {"chat_id": TELEGRAM_CHAT_ID, "text": "🎯 *SİSTEM TESTİ BAŞARILI!*\n\nÇoklu tarama modunda Telegram hattınız aktiftir.", "parse_mode": "Markdown"}
                 response = requests.post(url, json=payload, timeout=5)
-                if response.status_code == 200: st.success("🎯 Harika! Mesaj başarıyla gönderildi.")
+                if response.status_code == 200: st.success("🎯 Harika! Mesaj başarıyla gönderildi. Telefonunu kontrol et.")
                 else: st.error(f"❌ Telegram API Hata Döndürdü: {response.text}")
-            except Exception as e: st.error(f"🚨 Sunucu Hatası: {e}")
+            except Exception as e: st.error(f"🚨 Sunucu/Ağ Bağlantı Hatası: {e}")
 
-        st.info("🔄 **7/24 Arka Plan Tarayıcısı Aktif:** Grafik üzerinde kalın düz çizgiler ASIL SABİT kaleleri, kesikli ince çizgiler ise yürüyen momentum seviyelerini gösterir.")
+        st.info("🔄 **7/24 Arka Plan Tarayıcısı Aktif:** Menüde hangi enstrüman seçili olursa olsun, sistem arka planda tüm listeyi tarar ve herhangi birinde kırılım (sinyal) oluşursa anında cebinize gönderir.")
         
+        # Ekranda detaylarını, nedenlerini ve grafiğini görmek istediğin enstrüman seçimi
         secilen_forex_adi = st.selectbox("Ekranda Detaylı İncelemek İstediğiniz Küresel Enstrüman:", list(forex_assets.keys()))
+        
+        # Sırlama hatasını engellemek için listeyi en başta boş küme olarak sağlama alıyoruz
         sonuclar = []
 
         # 🤖 OTONOM ÇOKLU TARAMA DÖNGÜSÜ
         for asset_adi, asset_ticker in forex_assets.items():
             
+            # Her enstrüman için bağımsız hafıza alanı kilitliyoruz
             state_sinyal_key = f"fx_state_yon_{asset_adi}"
             state_fiyat_key = f"fx_lock_price_{asset_adi}"
             
@@ -855,36 +861,27 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 continue
                 
             if not df_fx.empty and len(df_fx) > 25:
-                if isinstance(df_fx.columns, pd.MultiIndex): 
-                    df_fx.columns = df_fx.columns.get_level_values(0)
-                df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
-
                 # --- ÇOK KATMANLI VERİ YAPISINI (USA/FOREX) KESİN DÜZLEŞTİRME KORUMASI ---
                 if isinstance(df_fx.columns, pd.MultiIndex): 
                     df_fx.columns = df_fx.columns.get_level_values(0)
                 df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
                 
-                # Sütunların tekil seriler haline getirilmesi (IndexingError Vermeyen Güvenli Sürüm)
-                df_fx['Open'] = df_fx['Open'].iloc[:, 0] if isinstance(df_fx['Open'], pd.DataFrame) or (df_fx['Open'].ndim > 1) else df_fx['Open']
-                df_fx['High'] = df_fx['High'].iloc[:, 0] if isinstance(df_fx['High'], pd.DataFrame) or (df_fx['High'].ndim > 1) else df_fx['High']
-                df_fx['Low'] = df_fx['Low'].iloc[:, 0] if isinstance(df_fx['Low'], pd.DataFrame) or (df_fx['Low'].ndim > 1) else df_fx['Low']
-                df_fx['Close'] = df_fx['Close'].iloc[:, 0] if isinstance(df_fx['Close'], pd.DataFrame) or (df_fx['Close'].ndim > 1) else df_fx['Close']
+                # Sütunların tekil seriler haline getirilerek güvenceye alınması (Çökmeyi engeller)
+                df_fx['Open'] = df_fx['Open'].iloc[:, 0] if isinstance(df_fx['Open'], pd.DataFrame) else df_fx['Open']
+                df_fx['High'] = df_fx['High'].iloc[:, 0] if isinstance(df_fx['High'], pd.DataFrame) else df_fx['High']
+                df_fx['Low'] = df_fx['Low'].iloc[:, 0] if isinstance(df_fx['Low'], pd.DataFrame) else df_fx['Low']
+                df_fx['Close'] = df_fx['Close'].iloc[:, 0] if isinstance(df_fx['Close'], pd.DataFrame) else df_fx['Close']
                 
-                # 🏛️ 2. YENİ EK: ASIL SABİT PSİKOLOJİK KALELER (Geniş Zamanlı Klasik Pivot Formülleri)
-                # Son 24 saatlik/barlık blok verilerinden sabit ana hatları çıkarır
-                gecmis_high = df_fx['High'].tail(24).max()
-                gecmis_low = df_fx['Low'].tail(24).min()
-                gecmis_close = df_fx['Close'].tail(24).mean() # Gürültüyü azaltmak için ortalama kapanış denge noktası
+                # 🛡️ YENİ: PİVOT DESTEK VE DİRENÇ HESAPLAMA (Son 15 Mum)
+                df_fx['Direnç_S1'] = df_fx['High'].rolling(window=15).max().shift(1)
+                df_fx['Destek_D1'] = df_fx['Low'].rolling(window=15).min().shift(1)
                 
-                sabit_pivot = (gecmis_high + gecmis_low + gecmis_close) / 3
-                asıl_direnc_kale = (2 * sabit_pivot) - gecmis_low
-                asıl_destek_kale = (2 * sabit_pivot) - gecmis_high
-                
-                # 3. Kristal Box Hesaplamaları (Donchian)
+                # 1. Kristal Box Hesaplamaları (Donchian)
                 df_fx['box_ust'] = df_fx['High'].rolling(window=20).max()
                 df_fx['box_alt'] = df_fx['Low'].rolling(window=20).min()
+                df_fx['box_orta'] = (df_fx['box_ust'] + df_fx['box_alt']) / 2
                 
-                # 4. Native ATR & Teknik İndikatör Hesaplamaları
+                # 2. Native ATR & Teknik İndikatör Hesaplamaları
                 high_low = df_fx['High'] - df_fx['Low']
                 high_close = (df_fx['High'] - df_fx['Close'].shift()).abs()
                 low_close = (df_fx['Low'] - df_fx['Close'].shift()).abs()
@@ -911,10 +908,10 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 ema21 = float(df_fx['EMA21'].iloc[-1])
                 ema50 = float(df_fx['EMA50'].iloc[-1])
                 
-                yuruyen_direnc = float(df_fx['Direnç_S1'].iloc[-1])
-                yuruyen_destek = float(df_fx['Destek_D1'].iloc[-1])
+                aktif_direnc = float(df_fx['Direnç_S1'].iloc[-1])
+                aktif_destek = float(df_fx['Destek_D1'].iloc[-1])
                 
-                # Price Action Sınıflandırıcı Katmanları
+                # 3. PRICE ACTION SINIFLANDIRICI KATMANI
                 son_mum_high = float(df_fx['High'].iloc[-1])
                 son_mum_low = float(df_fx['Low'].iloc[-1])
                 son_mum_open = float(df_fx['Open'].iloc[-1])
@@ -939,60 +936,73 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 is_msb_bullish = son_fiyat > son_ekstrem_zirve
                 is_msb_bearish = son_fiyat < son_ekstrem_dip
 
-                # 5. ÇİFT YÖNLÜ KARAR MOTORU
+                # 4. ÇİFT YÖNLÜ KARAR MOTORU (DESTEK/DİRENÇ ENTEGRELİ)
                 long_skor = 0.0
                 short_skor = 0.0
                 nedenler = []
                 
                 if son_fiyat > b_ust:
-                    long_skor += 3.5; nedenler.append("🟩 KRİSTAL BOX: Üst band yukarı kırıldı (Long +3.5)")
+                    long_skor += 3.5
+                    nedenler.append("🟩 KRİSTAL BOX: Üst band yukarı yönlü kırıldı (Long +3.5)")
                 elif son_fiyat < b_alt:
-                    short_skor += 3.5; nedenler.append("🟥 KRİSTAL BOX: Alt band aşağı kırıldı (Short +3.5)")
+                    short_skor += 3.5
+                    nedenler.append("🟥 KRİSTAL BOX: Alt band aşağı yönlü kırıldı (Short +3.5)")
                 else:
-                    long_skor += 0.5; short_skor += 0.5; nedenler.append("🟨 KRİSTAL BOX: Fiyat kutu içinde konsolide")
+                    long_skor += 0.5; short_skor += 0.5
+                    nedenler.append("🟨 KRİSTAL BOX: Fiyat kutu içinde konsolide oluyor (Nötr +0.5)")
                 
-                # Yürüyen Seviye Kırılım Kontrolleri (+1.0)
-                if son_fiyat > yuruyen_direnc:
-                    long_skor += 1.0; nedenler.append(f"🎯 MOMENTUM: {yuruyen_direnc:.4f} Anlık Direnci aşıldı (Long +1.0)")
-                elif son_fiyat < yuruyen_destek:
-                    short_skor += 1.0; nedenler.append(f"🎯 MOMENTUM: {yuruyen_destek:.4f} Anlık Desteği patladı (Short +1.0)")
-                
-                # 🏛️ ASIL SABİT KALE KONTROLÜ (Ekstra Güven Onayı +1.0)
-                if son_fiyat > asıl_direnc_kale:
-                    long_skor += 1.0; nedenler.append(f"🏰 ASIL KALE YIKILDI: {asıl_direnc_kale:.4f} Sabit Ana Direnci yukarı geçildi! (Long +1.0)")
-                elif son_fiyat < asıl_destek_kale:
-                    short_skor += 1.0; nedenler.append(f"🏰 ASIL KALE YIKILDI: {asıl_destek_kale:.4f} Sabit Ana Desteği aşağı yönlü kırıldı! (Short +1.0)")
+                # 🛡️ DESTEK DİRENÇ ETKİ KATMANI (AŞAĞIYA SHORT +1, YUKARIYA LONG +1)
+                if son_fiyat > aktif_direnc:
+                    long_skor += 1.0
+                    nedenler.append(f"🎯 DİRENÇ KIRILDI: {aktif_direnc:.4f} Ana Direnci yukarı aşıldı (Long +1.0)")
+                elif son_fiyat < aktif_destek:
+                    short_skor += 1.0
+                    nedenler.append(f"🎯 DESTEK KIRILDI: {aktif_destek:.4f} Ana Desteği aşağı yönlü patladı (Short +1.0)")
                     
                 if son_fiyat > ema21 and ema21 > ema50:
-                    long_skor += 1.5; nedenler.append("🟩 GANN/TREND: EMA'lar boğa diziliminde (Long +1.5)")
+                    long_skor += 3.0
+                    nedenler.append("🟩 GANN/TREND: EMA'lar boğa diziliminde ve fiyat üstünde (Long +3.0)")
                 elif son_fiyat < ema21 and ema21 < ema50:
-                    short_skor += 1.5; nedenler.append("🟥 GANN/TREND: EMA'lar ayı diziliminde (Short +1.5)")
+                    short_skor += 3.0
+                    nedenler.append("🟥 GANN/TREND: EMA'lar ayı diziliminde ve fiyat altında (Short +3.0)")
+                else:
+                    nedenler.append("🟨 GANN/TREND: Hareketli ortalamalar kararsız bölgede")
                     
-                if 50 < rsi_val < 70: long_skor += 1.0
-                elif 30 < rsi_val <= 50: short_skor += 1.0
+                if 50 < rsi_val < 70: long_skor += 1.5
+                elif 30 < rsi_val <= 50: short_skor += 1.5
+                elif rsi_val >= 70: short_skor += 1.0
+                elif rsi_val <= 30: long_skor += 1.0
 
-                if is_bullish_pin: long_skor += 1.0; nedenler.append("🔥 PRICE ACTION: Boğa Pin Bar")
-                if is_bullish_engulfing: long_skor += 1.0; nedenler.append("🔥 PRICE ACTION: Bullish Engulfing")
-                if is_msb_bullish: long_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Boğa yönlü kırıldı (MSB)")
+                if is_bullish_pin: long_skor += 1.5; nedenler.append("🔥 PRICE ACTION: Boğa Pin Bar oluştu")
+                if is_bullish_engulfing: long_skor += 1.5; nedenler.append("🔥 PRICE ACTION: Bullish Engulfing görüldü")
+                if is_msb_bullish: long_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Boğa yönlü kırıldı (MSB/CHoCH)")
                     
-                if is_bearish_pin: short_skor += 1.0; nedenler.append("❄️ PRICE ACTION: Ayı Pin Bar")
-                if is_bearish_engulfing: short_skor += 1.0; nedenler.append("❄️ PRICE ACTION: Bearish Engulfing")
-                if is_msb_bearish: short_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Ayı yönlü kırıldı (MSB)")
+                if is_bearish_pin: short_skor += 1.5; nedenler.append("❄️ PRICE ACTION: Ayı Pin Bar oluştu")
+                if is_bearish_engulfing: short_skor += 1.5; nedenler.append("❄️ PRICE ACTION: Bearish Engulfing görüldü")
+                if is_msb_bearish: short_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Ayı yönlü kırıldı (MSB/CHoCH)")
 
                 long_skor = min(10.0, round(long_skor, 1))
                 short_skor = min(10.0, round(short_skor, 1))
 
                 anlik_algoritma_yonu = "NÖTR (İZLE)"
-                if long_skor >= 7.0 and long_skor >= short_skor: anlik_algoritma_yonu = "LONG (YUKARI)"
-                elif short_skor >= 7.0 and short_skor > long_skor: anlik_algoritma_yonu = "SHORT (AŞAĞI)"
+                if long_skor >= 7.0 and long_skor >= short_skor:
+                    anlik_algoritma_yonu = "LONG (YUKARI)"
+                elif short_skor >= 7.0 and short_skor > long_skor:
+                    anlik_algoritma_yonu = "SHORT (AŞAĞI)"
 
+                # Listeye ana sayfada sıralanabilmesi için sonuçları ekliyoruz (KeyError Zırhı)
                 hibrit_hesap = max(long_skor, short_skor)
                 sonuclar.append({
-                    "Enstrüman": asset_adi, "Anlık Fiyat": son_fiyat, "Yön": anlik_algoritma_yonu,
-                    "Long Skor": long_skor, "Short Skor": short_skor, "Hibrit Skor": hibrit_hesap, "RSI": rsi_val
+                    "Enstrüman": asset_adi,
+                    "Anlık Fiyat": son_fiyat,
+                    "Yön": anlik_algoritma_yonu,
+                    "Long Skor": long_skor,
+                    "Short Skor": short_skor,
+                    "Hibrit Skor": hibrit_hesap,
+                    "RSI": rsi_val
                 })
 
-                # ARKA PLAN TELEGRAM BİLDİRİMİ
+                # AKILLI BELLEK KİLİTLEME & ARKA PLAN TELEGRAM BİLDİRİM TETİKLEYİCİ
                 if anlik_algoritma_yonu != "NÖTR (İZLE)" and st.session_state[state_sinyal_key] == "NÖTR (İZLE)":
                     st.session_state[state_sinyal_key] = anlik_algoritma_yonu
                     st.session_state[state_fiyat_key] = son_fiyat
@@ -1007,8 +1017,10 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                         f"**Enstrüman:** {asset_adi}\n"
                         f"**Strateji Yönü:** {anlik_algoritma_yonu}\n"
                         f"**Giriş Seviyesi:** `{son_fiyat:.4f}`\n"
-                        f"**🏰 ASIL SABİT DİRENÇ:** `{asıl_direnc_kale:.4f}`\n"
-                        f"**🏰 ASIL SABİT DESTEK:** `{asıl_destek_kale:.4f}`\n"
+                        f"**Dinamik Direnç:** `{aktif_direnc:.4f}`\n"
+                        f"**Dinamik Destek:** `{aktif_destek:.4f}`\n"
+                        f"**Hedef (TP):** `{hedef_tp:.4f}`\n"
+                        f"**Zarar Kes (SL):** `{risk_sl:.4f}`\n"
                         f"**Sistem Güven Skoru:** `{skor_val}/10`"
                     )
                     telegram_sinyal_gonder(mesaj_metni)
@@ -1017,7 +1029,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                     st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
                     st.session_state[state_fiyat_key] = 0.0
 
-                # 🖥️ EKRANDA SEÇİLİ OLAN ENSTRÜMANIN GÖSTERİMİ
+                # 🖥️ EKRANDA O AN SEÇİLİ OLAN ENSTRÜMANIN DETAYLI GÖRSEL GÖSTERİMİ
                 if asset_adi == secilen_forex_adi:
                     strateji_yonu = st.session_state[state_sinyal_key]
                     
@@ -1034,6 +1046,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                         durum_msg = "🟡 TEST BÖLGESİ - BELİRLİ BİR SEVİYE KIRILIMI BEKLENİYOR"
                         sl_noktasi = son_fiyat - (atr_val * 2.0); tp_noktasi = son_fiyat + (atr_val * 2.0)
 
+                    # Savaş Kartı Gösterimi
                     st.markdown(f"""
                         <div style="background-color: {durum_color}; padding: 25px; border-radius: 15px; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
                             <h1 style="color: #FFFFFF !important; border: none; margin: 0; font-size: 2.2rem;">{asset_adi} // DETAYLI CANLI MONITOR</h1>
@@ -1041,10 +1054,11 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                         </div>
                     """, unsafe_allow_html=True)
 
+                    # ÇİFT FİYAT DESTEKLİ METRIC SENSÖRLERİ
                     f1, f2, f3, f4, f5 = st.columns(5)
                     if strateji_yonu != "NÖTR (İZLE)":
-                        f1.metric("🎯 SİNYAL GİRİŞİ", f"{sinyal_tetik_fiyati:.4f}")
-                        f2.metric("⚡ ANLIK FİYAT", f"{son_fiyat:.4f}", delta=f"{son_fiyat - sinyal_tetik_fiyati:.4f}")
+                        f1.metric("🎯 SİNYAL GİRİŞİ (SABİT)", f"{sinyal_tetik_fiyati:.4f}")
+                        f2.metric("⚡ ANLIK FİYAT (CANLI)", f"{son_fiyat:.4f}", delta=f"{son_fiyat - sinyal_tetik_fiyati:.4f}")
                     else:
                         f1.metric("ANLIK FİYAT", f"{son_fiyat:.4f}")
                         f2.metric("GİRİŞ DURUMU", "BEKLEMEDE")
@@ -1053,48 +1067,57 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                     f4.metric("🎯 OTONOM TP", f"{tp_noktasi:.4f}")
                     f5.metric("🛑 OTONOM SL", f"{sl_noktasi:.4f}")
 
+                    # PANEL YERLEŞİMİ (Sol: İstatistikler | Sağ: Gelişmiş Plotly)
                     sol_p, sag_p = st.columns([1, 2])
                     
                     with sol_p:
                         st.markdown("### 🧠 Çift Yönlü Sistem Ortalaması")
-                        st.markdown(f"**🟢 Long Skor:** `{long_skor} / 10`")
-                        st.markdown(f"""<div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 12px;"><div style="width: {int(long_skor*10)}%; background-color: #2ECC71; height: 100%; border-radius: 4px;"></div></div>""", unsafe_allow_html=True)
-                        st.markdown(f"**🔴 Short Skor:** `{short_skor} / 10`")
-                        st.markdown(f"""<div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 20px;"><div style="width: {int(short_skor*10)}%; background-color: #E74C3C; height: 100%; border-radius: 4px;"></div></div>""", unsafe_allow_html=True)
+                        st.markdown(f"**🟢 Long Algoritma Ağırlığı:** `{long_skor} / 10`")
+                        st.markdown(f"""
+                        <div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 12px;">
+                            <div style="width: {int(long_skor*10)}%; background-color: #2ECC71; height: 100%; border-radius: 4px;"></div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        st.markdown(f"**🔴 Short Algoritma Ağırlığı:** `{short_skor} / 10`")
+                        st.markdown(f"""
+                        <div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 20px;">
+                            <div style="width: {int(short_skor*10)}%; background-color: #E74C3C; height: 100%; border-radius: 4px;"></div>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
                         st.markdown("#### 🔍 Sinyal Gerekçeleri")
                         for neden in nedenler: st.write(f"- {neden}")
                             
-                        st.markdown("#### 🏰 Asıl Kaleler (Sabit)")
-                        st.success(f"**🏰 Ana Direniş Hattı:** `{asıl_direnc_kale:.4f}`")
-                        st.info(f"**🏰 Ana Güvenlik Üssü (Destek):** `{asıl_destek_kale:.4f}`")
+                        st.markdown("#### 🔬 Teknik Değerler")
+                        st.write(f"**RSI Göstergesi:** {rsi_val:.2f}")
+                        st.write(f"**Ana Direnç Seviyesi:** {aktif_direnc:.4f}")
+                        st.write(f"**Ana Destek Seviyesi:** {aktif_destek:.4f}")
 
                     with sag_p:
                         st.markdown("### 📈 Çift Yönlü Grafik ve Hedef Haritası")
                         fig_fx = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.7, 0.3])
                         fig_fx.add_trace(go.Candlestick(x=df_fx.index, open=df_fx['Open'], high=df_fx['High'], low=df_fx['Low'], close=df_fx['Close'], name="Fiyat"), row=1, col=1)
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_ust'], line=dict(color='#8E44AD', width=1.5, dash='dash'), name="Box Üst Tavan"), row=1, col=1)
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_alt'], line=dict(color='#8E44AD', width=1.5, dash='dash'), name="Box Alt Taban"), row=1, col=1)
                         
-                        # 🏰 KALIN VE DÜZ ÇİZGİLER (Asıl Sabit Kaleler)
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=[asıl_direnc_kale]*len(df_fx), line=dict(color='#8B0000', width=3.5, dash='solid'), name="🏰 ASIL DİRENÇ KALESİ"), row=1, col=1)
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=[asıl_destek_kale]*len(df_fx), line=dict(color='#006400', width=3.5, dash='solid'), name="🏰 ASIL DESTEK KALESİ"), row=1, col=1)
+                        # Grafiğe Yatay Destek ve Dirençlerin Çizilmesi
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['Direnç_S1'], line=dict(color='#C0392B', width=2), name="🔴 Ana Direnç"), row=1, col=1)
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['Destek_D1'], line=dict(color='#27AE60', width=2), name="🟢 Ana Destek"), row=1, col=1)
                         
-                        # İNCE VE KESİKLİ ÇİZGİLER (Yürüyen/Dinamik Momentum Seviyeleri)
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['Direnç_S1'], line=dict(color='#C0392B', width=1.5, dash='dot'), name="🏃 Yürüyen Direnç"), row=1, col=1)
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['Destek_D1'], line=dict(color='#27AE60', width=1.5, dash='dot'), name="🏃 Yürüyen Destek"), row=1, col=1)
-                        
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_ust'], line=dict(color='#8E44AD', width=1.2, dash='dash'), name="Box Üst"), row=1, col=1)
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_alt'], line=dict(color='#8E44AD', width=1.2, dash='dash'), name="Box Alt"), row=1, col=1)
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA21'], line=dict(color='#E67E22', width=1.0), name="EMA 21"), row=1, col=1)
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA50'], line=dict(color='#3498DB', width=1.0), name="EMA 50"), row=1, col=1)
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA21'], line=dict(color='#E67E22', width=1.2), name="EMA 21"), row=1, col=1)
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA50'], line=dict(color='#3498DB', width=1.2), name="EMA 50"), row=1, col=1)
                         
                         if strateji_yonu != "NÖTR (İZLE)":
                             fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[tp_noktasi, tp_noktasi], line=dict(color='#2ECC71', width=2.5), name="Hedef (TP)"), row=1, col=1)
                             fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sl_noktasi, sl_noktasi], line=dict(color='#E74C3C', width=2.5), name="Risk Sınırı (SL)"), row=1, col=1)
+                            fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sinyal_tetik_fiyati, sinyal_tetik_fiyati], line=dict(color='#111111', width=2, dash='dot'), name="Sabit Giriş Seviyesi"), row=1, col=1)
                         
                         fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['RSI'], line=dict(color='#16A085', width=1.5), name="RSI"), row=2, col=1)
                         fig_fx.update_layout(xaxis_rangeslider_visible=False, height=650, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10))
                         st.plotly_chart(fig_fx, use_container_width=True)
 
+        # 📊 TÜM LİSTE ÖZET TARAMA TABLOSU (759. Satırdaki KeyError'ı Kökten Engelleyen Bölüm)
         if sonuclar:
             st.markdown("### 📋 Küresel Piyasalar Anlık Tarama Özeti")
             df_sonuc = pd.DataFrame(sonuclar).sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True)
