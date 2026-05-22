@@ -1100,7 +1100,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
 # =================================================================================
 # ÇEKİRDEK 4: ULTRA FXMATİK (QUANT MATRIX) - DİNAMİK RENKLİ VE PARLAK KANAL MOTORU
 # =================================================================================
-elif calisma_modu == "Çekirdek 4: Ultra FXMatik (Quant Matrix)":
+elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
     st.markdown("## 🦅 ULTRA FXMATİK (QUANT MATRIX COMPASS)")
     st.markdown("---")
     
