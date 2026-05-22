@@ -700,16 +700,13 @@ if calisma_modu == "Lazer (Detaylı Analiz & Strateji)":
 # =================================================================================
 # =================================================================================
 # =================================================================================
-# ÇEKİRDEK 2: FULL HİBRİT RADAR (DIRECT API SÜRÜMÜ - BAN GEÇMEZ)
+# ÇEKİRDEK 2: FULL HİBRİT RADAR
 # =================================================================================
 elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
     st.markdown("## 📡 BIST 100 DERİN HİBRİT TARAMA (TEKNİK + TEMEL)")
-    
     if 'hibrit_tablo_full' not in st.session_state:
-        try: 
-            st.session_state.hibrit_tablo_full = pd.read_csv("son_tarama_kaydi.csv")
-        except FileNotFoundError: 
-            st.session_state.hibrit_tablo_full = pd.DataFrame()
+        try: st.session_state.hibrit_tablo_full = pd.read_csv("son_tarama_kaydi.csv")
+        except FileNotFoundError: st.session_state.hibrit_tablo_full = pd.DataFrame()
 
     bist100_tam_liste = [
         "AEFES.IS", "AGHOL.IS", "AKBNK.IS", "AKCNS.IS", "AKFGY.IS", "AKSA.IS", "AKSEN.IS", "ALARK.IS", "ALBRK.IS", 
@@ -730,194 +727,19 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
         ilerleme = st.progress(0)
         durum_m = st.empty()
         sonuclar = []
-        
-        import requests
-        
-        # Yahoo'nun kütüphane banını geçmek için ham sorgu başlıkları
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webkit,text/json;q=0.8',
-            'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7'
-        }
-
         for i, kod in enumerate(bist100_tam_liste):
-            durum_m.text(f"📡 Doğrudan API Bağlantısı Aktif | Analiz Ediliyor: {kod} ({i+1}/{len(bist100_tam_liste)})")
-            
-            try:
-                # Kütüphane kullanmadan doğrudan Yahoo v8 query uç noktasına bağlanıyoruz (Engellenmez)
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{kod}?range=3mo&interval=1d"
-                response = requests.get(url, headers=headers, timeout=5)
-                
-                if response.status_code != 200:
-                    continue
-                    
-                data = response.json()
-                result = data.get('chart', {}).get('result', [])
-                
-                if not result or 'indicators' not in result[0]:
-                    continue
-                    
-                # Zaman serisi ve kapanış fiyatlarını ayrıştırıyoruz
-                quotes = result[0]['indicators']['quote'][0]
-                closes = quotes.get('close', [])
-                
-                # Boş değerleri (None) temizliyoruz
-                closes = [c for c in closes if c is not None]
-                if len(closes) < 5:
-                    continue
-                    
-                son_fiyat = float(closes[-1])
-                skor = 0
-                
-                # Pandas serisine dönüştürüp teknik göstergeleri hesaplıyoruz
-                df_calc = pd.DataFrame({"Close": closes})
-                
-                # 1. Gösterge: EMA 21
-                ema21_series = df_calc['Close'].ewm(span=21, adjust=False).mean()
-                ema21 = float(ema21_series.iloc[-1])
-                if son_fiyat > ema21: skor += 1
-                
-                # 2. Gösterge: RSI
-                r_delta = df_calc['Close'].diff()
-                r_gain = r_delta.clip(lower=0)
-                r_loss = -r_delta.clip(upper=0)
-                r_avg_gain = r_gain.ewm(com=13, adjust=False).mean()
-                r_avg_loss = r_loss.ewm(com=13, adjust=False).mean()
-                
-                if r_avg_loss.iloc[-1] != 0:
-                    r_rs = r_avg_gain.iloc[-1] / r_avg_loss.iloc[-1]
-                    rsi = float(100 - (100 / (1 + r_rs)))
-                else:
-                    rsi = 50.0
-                    
-                if 30 < rsi < 65: skor += 1
-                
-                # Temel verileri çekmek için (Ban yememek adına) korumalı ek sorgu yapısı
-                fk, pddd, roe = 100, 100, 0
-                try:
-                    # Temel rasyolar için alternatif v10 modülü sorgusu
-                    fund_url = f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{kod}?modules=summaryDetail,defaultKeyStatistics"
-                    fund_resp = requests.get(fund_url, headers=headers, timeout=3)
-                    if fund_resp.status_code == 200:
-                        fund_data = fund_resp.json()
-                        res_fund = fund_data.get('quoteSummary', {}).get('result', [{}])[0]
-                        
-                        summary = res_fund.get('summaryDetail', {})
-                        stats = res_fund.get('defaultKeyStatistics', {})
-                        
-                        fk = summary.get('trailingPE', {}).get('raw', 100)
-                        pddd = stats.get('priceToBook', {}).get('raw', 100)
-                        roe = stats.get('returnOnEquity', {}).get('raw', 0)
-                except:
-                    pass
-
-                if isinstance(fk, (int, float)) and fk < 15: skor += 1
-                else: fk = 100
-                
-                if isinstance(pddd, (int, float)) and pddd < 3: skor += 1
-                else: pddd = 100
-                
-                if isinstance(roe, (int, float)) and roe > 0.20: skor += 1
-                else: roe = 0
-
-                sonuclar.append({
-                    "Hisse": kod.replace(".IS", ""), 
-                    "Fiyat": round(son_fiyat, 2),
-                    "F/K": round(fk, 2) if fk != 100 else "N/A", 
-                    "PD/DD": round(pddd, 2) if pddd != 100 else "N/A",
-                    "ROE (%)": round(roe*100, 2) if roe > 0 else "N/A", 
-                    "RSI": round(rsi, 2), 
-                    "Hibrit Skor": skor,
-                    "Sistem Notu": "👑 ŞAMPİYON" if skor >= 4 else ("🟢 GÜÇLÜ" if skor == 3 else ("🟡 MAKUL" if skor == 2 else "⚪ İZLE"))
-                })
-                
-                # Çok agresif yüklenmemek için hafif bekleme
-                time.sleep(0.15)
-                
-            except Exception as e:
-                pass
-                
-            ilerleme.progress((i + 1) / len(bist100_tam_liste))
-        
-        # Ekrana basma ve CSV kayıt motoru
-        if len(sonuclar) > 0:
-            df_sonuc = pd.DataFrame(sonuclar)
-            df_sonuc = df_sonuc.sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True)
-            st.session_state.hibrit_tablo_full = df_sonu
-# =================================================================================
-# =================================================================================
-# ÇEKİRDEK 2: FULL HİBRİT RADAR (SABIRLI VE AKILLI EMNİYET SÜRÜMÜ)
-# =================================================================================
-elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
-    st.markdown("## 📡 BIST 100 DERİN HİBRİT TARAMA (TEKNİK + TEMEL)")
-    if 'hibrit_tablo_full' not in st.session_state:
-        try: 
-            st.session_state.hibrit_tablo_full = pd.read_csv("son_tarama_kaydi.csv")
-        except FileNotFoundError: 
-            st.session_state.hibrit_tablo_full = pd.DataFrame()
-
-    bist100_tam_liste = [
-        "AEFES.IS", "AGHOL.IS", "AKBNK.IS", "AKCNS.IS", "AKFGY.IS", "AKSA.IS", "AKSEN.IS", "ALARK.IS", "ALBRK.IS", 
-        "ALFAS.IS", "ARCLK.IS", "ASELS.IS", "ASTOR.IS", "ASUZU.IS", "AYDEM.IS", "AYGAZ.IS", "BAGFS.IS", "BERA.IS", 
-        "BIENY.IS", "BIMAS.IS", "BRISA.IS", "BRSAN.IS", "BUCIM.IS", "CANTE.IS", "CCOLA.IS", "CIMSA.IS", "CWENE.IS", 
-        "DOAS.IS", "DOHOL.IS", "EGEEN.IS", "ECILC.IS", "EKGYO.IS", "ENERY.IS", "ENJSA.IS", "ENKAI.IS", "EREGL.IS", 
-        "EUREN.IS", "EUPWR.IS", "FROTO.IS", "GARAN.IS", "GENIL.IS", "GESAN.IS", "GLYHO.IS", "GUBRF.IS", "GWIND.IS", 
-        "HALKB.IS", "HEKTS.IS", "HKTM.IS", "HLGYO.IS", "IMASM.IS", "IPEKE.IS", "ISCTR.IS", "ISDMR.IS", "ISGYO.IS", 
-        "ISMEN.IS", "IZENR.IS", "KALES.IS", "KARSN.IS", "KCAER.IS", "KCHOL.IS", "KMPUR.IS", "KONTR.IS", "KONYA.IS", 
-        "KOZAA.IS", "KOZAL.IS", "KRDMD.IS", "KZBGY.IS", "MAVI.IS", "MGROS.IS", "MIATK.IS", "ODAS.IS", "OTKAR.IS", 
-        "OYAKC.IS", "PENTA.IS", "PETKM.IS", "PGSUS.IS", "PNLSN.IS", "QUAGR.IS", "SAHOL.IS", "SASA.IS", "SDTTR.IS", 
-        "SISE.IS", "SMRTG.IS", "SOKM.IS", "TABGD.IS", "TAVHL.IS", "TCELL.IS", "THYAO.IS", "TKFEN.IS", "TOASO.IS", 
-        "TSKB.IS", "TTKOM.IS", "TTRAK.IS", "TUKAS.IS", "TUPRS.IS", "ULKER.IS", "VAKBN.IS", "VESBE.IS", "VESTL.IS", 
-        "YKBNK.IS", "YYLGD.IS", "ZOREN.IS"
-    ]
-
-    if st.button("🚀 FULL DERİN TARAMAYI BAŞLAT", use_container_width=True):
-        ilerleme = st.progress(0)
-        durum_m = st.empty()
-        sonuclar = []
-        
-        for i, kod in enumerate(bist100_tam_liste):
-            # --- AKILLI MOLA KALKANI ---
-            # Her 15 hissede bir Yahoo sunucularını yormamak için 4 saniyelik kurumsal mola verilir
-            if i > 0 and i % 15 == 0:
-                durum_m.text("💤 Anti-Ban Sistemi Aktif: Sunucular Dinlendiriliyor (4 Saniye)...")
-                time.sleep(4.0)
-                
-            durum_m.text(f"⏳ Emniyetli Modda Analiz Ediliyor: {kod} ({i+1}/{len(bist100_tam_liste)})")
-            
+            durum_m.text(f"⏳ Analiz Ediliyor: {kod} ({i+1}/{len(bist100_tam_liste)})")
             try:
                 t = yf.Ticker(kod)
                 hist = t.history(period="6mo", interval="1d")
                 inf = t.info
-                
-                if hist.empty or len(hist) < 5: 
-                    continue
-                
-                # MultiIndex sütun kaymalarına karşı koruma kalkanı
-                if isinstance(hist.columns, pd.MultiIndex): 
-                    hist.columns = hist.columns.get_level_values(0)
-                hist.columns = [str(c).strip().capitalize() for c in hist.columns]
-                
+                if hist.empty: continue
                 skor = 0
                 son_fiyat = hist['Close'].iloc[-1].item()
-                
-                # Gösterge 1: EMA 21 Kontrolü
-                ema21_series = hist['Close'].ewm(span=21, adjust=False).mean()
-                ema21 = ema21_series.iloc[-1].item()
+                ema21 = ta.ema(hist['Close'], length=21).iloc[-1].item()
+                rsi = ta.rsi(hist['Close'], length=14).iloc[-1].item()
                 if son_fiyat > ema21: skor += 1
-                
-                # Gösterge 2: RSI Kontrolü
-                r_delta = hist['Close'].diff()
-                r_gain = r_delta.clip(lower=0)
-                r_loss = -r_delta.clip(upper=0)
-                r_avg_gain = r_gain.ewm(com=13, adjust=False).mean()
-                r_avg_loss = r_loss.ewm(com=13, adjust=False).mean()
-                r_rs = r_avg_gain / r_avg_loss
-                rsi_series = 100 - (100 / (1 + r_rs))
-                rsi = rsi_series.iloc[-1].item()
                 if 30 < rsi < 65: skor += 1
-                
-                # Gösterge 3, 4, 5: Temel Rasyolar
                 fk = inf.get('trailingPE', 100)
                 if fk < 15: skor += 1
                 pddd = inf.get('priceToBook', 100)
@@ -931,41 +753,22 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
                     "ROE (%)": round(roe*100, 2) if roe else "N/A", "RSI": round(rsi, 2), "Hibrit Skor": skor,
                     "Sistem Notu": "👑 ŞAMPİYON" if skor >= 4 else ("🟢 GÜÇLÜ" if skor == 3 else ("🟡 MAKUL" if skor == 2 else "⚪ İZLE"))
                 })
-                
-                # Sabit kontrollü bekleme (İstekler arasına insani nefes payı: 1.5 saniye)
-                time.sleep(1.5)
-                
-            except: 
-                pass
-                
+                time.sleep(0.1)
+            except: pass
             ilerleme.progress((i + 1) / len(bist100_tam_liste))
-        
-        # --- KİLİTLENMEYİ ÖNLEYEN KALKAN BLOKU ---
-        if len(sonuclar) > 0:
-            df_sonuc = pd.DataFrame(sonuclar)
-            if "Hibrit Skor" in df_sonuc.columns:
-                df_sonuc = df_sonuc.sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True)
-            else:
-                df_sonuc = df_sonuc.reset_index(drop=True)
-                
-            st.session_state.hibrit_tablo_full = df_sonuc
-            df_sonuc.to_csv("son_tarama_kaydi.csv", index=False)
-            durum_m.success("✅ Emniyetli tarama başarıyla tamamlandı ve kaydedildi!")
-        else:
-            durum_m.error("🚨 Yahoo Finance bağlantısı henüz açılmadı (Ban devam ediyor). Kayıtlı son başarılı tablo aşağıya getirilmiştir.")
+        df_sonuc = pd.DataFrame(sonuclar).sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True)
+        st.session_state.hibrit_tablo_full = df_sonuc
+        df_sonuc.to_csv("son_tarama_kaydi.csv", index=False)
+        durum_m.success("✅ Kaydedildi!")
 
-    # Arayüz Tablo Basım Motoru
-    if 'hibrit_tablo_full' in st.session_state and not st.session_state.hibrit_tablo_full.empty:
+    if not st.session_state.hibrit_tablo_full.empty:
         def renk_motoru(val):
             if val == "👑 ŞAMPİYON": return 'background-color: #FFD700; color: black; font-weight: bold;'
             if val == "🟢 GÜÇLÜ": return 'background-color: #C8E6C9; color: black; font-weight: bold;'
             return ''
-        
-        if 'Sistem Notu' in st.session_state.hibrit_tablo_full.columns:
-            styled_df = st.session_state.hibrit_tablo_full.style.map(renk_motoru, subset=['Sistem Notu'])
-            st.dataframe(styled_df, use_container_width=True, height=800)
-        else:
-            st.dataframe(st.session_state.hibrit_tablo_full, use_container_width=True, height=800)
+        styled_df = st.session_state.hibrit_tablo_full.style.map(renk_motoru, subset=['Sistem Notu'])
+        st.dataframe(styled_df, use_container_width=True, height=800)
+
 # =================================================================================
 # =================================================================================
 # ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (TAM OTONOM ÇOKLU ENSTRÜMAN RADARI - DESTEK/DİRENÇ DESTEKLİ)
