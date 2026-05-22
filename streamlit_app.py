@@ -1297,6 +1297,39 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
                 
                 dragmode="pan",  # Sürükleme modunu doğrudan el ile tutmaya ayarladık
                 
-                # Eksen kilitlerini kaldırıyoruz (Yukarı, aşağı, sağa, sola serbest salınım)
+            # Eksen kilitlerini kaldırıyoruz (Yukarı, aşağı, sağa, sola serbest salınım)
                 xaxis=dict(fixedrange=False),
-                yaxis=dict(fixed
+                yaxis=dict(fixedrange=False),
+                xaxis2=dict(fixedrange=False),
+                yaxis2=dict(fixedrange=False)
+            )
+            
+            st.plotly_chart(
+                fig_ultra, 
+                use_container_width=True, 
+                config={
+                    'scrollZoom': True,      # Fare tekerleği veya çift parmakla serbest zoom yapar
+                    'displayModeBar': True,  # Üst panel kontrol çubuğunu açar
+                    'modeBarButtonsToRemove': ['select2d', 'lasso2d'] # Arayüzü sadeleştirir
+                }
+            )
+
+            # 🎯 STRATEJİK HEDEF MATRİSİ CARD ALANI
+            st.markdown("### 🏹 QUANT STRATEJİ KARTI")
+            s1, s2, s3 = st.columns(3)
+            
+            if "GÜÇLÜ BOĞA" in durum_text or "GÜÇLÜ AYI" in durum_text:
+                s1.success(f"🎯 **Kâr Al (TP) Seviyesi:** {tp_hedef:.4f}")
+                s2.error(f"🛑 **Zarar Kes (SL) Seviyesi:** {sl_stop:.4f}")
+                s3.info(f"⚖️ **Trend İvme Skoru:** {hiz_skoru}")
+            elif "YALANCI KIRILIM" in durum_text:
+                s1.warning("⚠️ İşleme Girme! (Tuzak Aktif)")
+                s2.info(f"🔄 Kutu İçi Geri Çekilme Hedefi: {tp_hedef:.4f}")
+                s3.write(f"RSI Seviyesi: {rsi_fx:.1f}")
+            else:
+                s1.info(f"⚡ Üst Sınır Geçilirse (AL): {kutu_tavan:.4f}")
+                s2.info(f"⚡ Alt Sınır Patlarsa (SAT): {kutu_taban:.4f}")
+                s3.write(f"📦 Kutu Genişlik Oranı: %{oransal_genislik:.2f}")
+                
+    except Exception as e:
+        st.warning("Veriler işlenirken anlık bir senkronizasyon gecikmesi oldu.
