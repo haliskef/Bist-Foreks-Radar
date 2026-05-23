@@ -1142,11 +1142,12 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
         
         kutu_bar_boyu = st.slider("Kristal Kutu Bar Genişliği (Matris Ölçüsü)", 30, 200, 90)
 
-    # 🛡️ Veri Çekme Katmanı
+   # 🛡️ Veri Çekme Katmanı (GEÇMİŞİ HAFIZADA TUTAN YENİ MODEL)
     try:
         t_engine = yf.Ticker(ticker_sembol)
-        sure_kilit = "1mo" if periyot_kod == "15m" else ("2mo" if periyot_kod == "1h" else "1y")
-        df_raw = t_engine.history(period=sure_kilit, interval=periyot_kod)
+        
+        # Geçmişi rahatça görebilmek için havuzu çok geniş tutuyoruz (Örn: Hep 1 yıllık veri çekilir)
+        df_raw = t_engine.history(period="1y", interval=periyot_kod)
         
         if df_raw.empty:
             st.error("⚠️ Global sunuculardan veri çekilemedi. Lütfen daha sonra tekrar deneyin.")
@@ -1159,29 +1160,32 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
                 if hasattr(df_raw[col], 'columns') or (type(df_raw[col]).__name__ == 'DataFrame'):
                     df_raw[col] = df_raw[col].iloc[:, 0]
             
-            df_m = df_raw.tail(kutu_bar_boyu).copy()
+            # 🚨 ARTIK VERİYİ KESMİYORUZ! Grafiğe tüm geçmişi (df_m) gönderiyoruz.
+            df_m = df_raw.copy()
+            
+            # 📦 Kristal Kutu ve Gann hesaplamalarını ise sadece senin seçtiğin son barlarla yapıyoruz
+            df_box = df_m.tail(kutu_bar_boyu).copy()
             
             son_fiyat = float(df_m['Close'].iloc[-1])
-            kutu_tavan = float(df_m['High'].max())
-            kutu_taban = float(df_m['Low'].min())
+            kutu_tavan = float(df_box['High'].max())
+            kutu_taban = float(df_box['Low'].min())
             kutu_merkez = (kutu_tavan + kutu_taban) / 2
             kutu_boyutu = kutu_tavan - kutu_taban
             
-            # 📐 1. KATMAN: ATR VOLATİLİTE VE KANAL DARLIK KONTROLÜ
-            high_low = df_m['High'] - df_m['Low']
-            high_close = np.abs(df_m['High'] - df_m['Close'].shift())
-            low_close = np.abs(df_m['Low'] - df_m['Close'].shift())
+            # 📐 1. KATMAN: ATR VOLATİLİTE (Son kutuya göre)
+            high_low = df_box['High'] - df_box['Low']
+            high_close = np.abs(df_box['High'] - df_box['Close'].shift())
+            low_close = np.abs(df_box['Low'] - df_box['Close'].shift())
             ranges = pd.concat([high_low, high_close, low_close], axis=1)
             true_range = ranges.max(axis=1)
             atr_val = float(true_range.ewm(span=14, adjust=False).mean().iloc[-1])
             
-            # Kanal darlık tespiti
             oransal_genislik = (kutu_boyutu / kutu_merkez) * 100
             is_dar_kanal = oransal_genislik < 1.5
             
-            # 📐 2. KATMAN: GANN TAYFI GEOMETRİSİ
-            x_idx = np.arange(len(df_m))
-            fiyat_adim_katsayisi = kutu_boyutu / len(df_m)
+            # 📐 2. KATMAN: GANN TAYFI GEOMETRİSİ (Kutunun başladığı endekse göre)
+            x_idx = np.arange(len(df_box))
+            fiyat_adim_katsayisi = kutu_boyutu / len(df_box)
             gann_1x1_son = kutu_taban + (fiyat_adim_katsayisi * 1.0 * x_idx[-1])
             gann_2x1_son = kutu_taban + (fiyat_adim_katsayisi * 2.0 * x_idx[-1])
             
@@ -1190,11 +1194,10 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
             elif son_fiyat > gann_1x1_son: hiz_skoru = "POZİTİF İVME"
             else: hiz_skoru = "NEGATİF BASKI"
 
-            # 📐 3. KATMAN: RSI VE SİNYAL KOMBİNASYONU
+            # 📐 3. KATMAN: RSI
             diff = df_m['Close'].diff()
             rsi_fx = float(100 - (100 / (1 + (diff.clip(lower=0).ewm(com=13, adjust=False).mean() / (-diff.clip(upper=0)).ewm(com=13, adjust=False).mean()))).iloc[-1])
 
-            # Duruma göre dinamik renk ve görsel kalınlık parametreleri
             if son_fiyat >= kutu_tavan:
                 if rsi_fx > 52:
                     durum_text = "🚀 KRİSTAL KUTU YUKARI KIRILDI (GÜÇLÜ BOĞA SİNYALİ)"
@@ -1252,23 +1255,26 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
             # 📈 Gelişmiş Plotly Çizim Alanı
             fig_ultra = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.78, 0.22])
             
-            # Mum Grafik Konturu
+            # 🚨 TÜM GEÇMİŞİ (df_m) EKRANA BASIYORUZ
             fig_ultra.add_trace(go.Candlestick(
                 x=df_m.index, open=df_m['Open'], high=df_m['High'], low=df_m['Low'], close=df_m['Close'],
                 name=fx_secilen, increasing_line_color='#2ECC71', decreasing_line_color='#E74C3C'
             ), row=1, col=1)
             
-            # Kristal Kutu Sınır Hatları
-            fig_ultra.add_trace(go.Scatter(x=[df_m.index[0], df_m.index[-1]], y=[kutu_tavan, kutu_tavan], line=dict(color=kanal_grafik_rengi, width=kanal_kalinligi), name="Kutu Direnç Sınırı"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=[df_m.index[0], df_m.index[-1]], y=[kutu_taban, kutu_taban], line=dict(color=kanal_grafik_rengi, width=kanal_kalinligi), name="Kutu Destek Sınırı"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=[df_m.index[0], df_m.index[-1]], y=[kutu_merkez, kutu_merkez], line=dict(color='#7F8C8D', width=1, dash='dot'), name="Merkez Denge Ekseni"), row=1, col=1)
+            # Kristal Kutu Sınırları (Sadece seçilen son barların başlangıç tarihinden bitiş tarihine kadar çizilir)
+            kutu_baslangic_tarihi = df_box.index[0]
+            kutu_bitis_tarihi = df_box.index[-1]
+            
+            fig_ultra.add_trace(go.Scatter(x=[kutu_baslangic_tarihi, kutu_bitis_tarihi], y=[kutu_tavan, kutu_tavan], line=dict(color=kanal_grafik_rengi, width=kanal_kalinligi), name="Kutu Direnç Sınırı"), row=1, col=1)
+            fig_ultra.add_trace(go.Scatter(x=[kutu_baslangic_tarihi, kutu_bitis_tarihi], y=[kutu_taban, kutu_taban], line=dict(color=kanal_grafik_rengi, width=kanal_kalinligi), name="Kutu Destek Sınırı"), row=1, col=1)
+            fig_ultra.add_trace(go.Scatter(x=[kutu_baslangic_tarihi, kutu_bitis_tarihi], y=[kutu_merkez, kutu_merkez], line=dict(color='#7F8C8D', width=1, dash='dot'), name="Merkez Denge Ekseni"), row=1, col=1)
 
-            # Gann Tayfı Geometrisi
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 2.0 * x_idx), line=dict(color='#9B59B6', width=1, dash='dash'), name="Gann 2x1 (İvme)"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 1.0 * x_idx), line=dict(color='#3498DB', width=1.5), name="Gann 1x1 (Ana Denge)"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 0.5 * x_idx), line=dict(color='#1ABC9C', width=1, dash='dash'), name="Gann 1x2 (Yavaş)"), row=1, col=1)
+            # Gann Tayfı Geometrisi (Sadece son kutu alanı içinde açılır)
+            fig_ultra.add_trace(go.Scatter(x=df_box.index, y=kutu_taban + (fiyat_adim_katsayisi * 2.0 * x_idx), line=dict(color='#9B59B6', width=1, dash='dash'), name="Gann 2x1 (İvme)"), row=1, col=1)
+            fig_ultra.add_trace(go.Scatter(x=df_box.index, y=kutu_taban + (fiyat_adim_katsayisi * 1.0 * x_idx), line=dict(color='#3498DB', width=1.5), name="Gann 1x1 (Ana Denge)"), row=1, col=1)
+            fig_ultra.add_trace(go.Scatter(x=df_box.index, y=kutu_taban + (fiyat_adim_katsayisi * 0.5 * x_idx), line=dict(color='#1ABC9C', width=1, dash='dash'), name="Gann 1x2 (Yavaş)"), row=1, col=1)
 
-            # Duruma Göre Sağ Uca Fırlayan Dinamik Çıkış (TP/SL) Çizgileri
+            # Dinamik Çıkış (TP/SL) Çizgileri
             c_x = [df_m.index[-15], df_m.index[-1]]
             
             if "GÜÇLÜ BOĞA" in durum_text or "GÜÇLÜ AYI" in durum_text:
@@ -1281,23 +1287,18 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
                 fig_ultra.add_trace(go.Scatter(x=c_x, y=[kutu_tavan, kutu_tavan], line=dict(color='#E74C3C', width=1.5, dash='dot'), name="Yukarı Tetik Hattı"), row=1, col=1)
                 fig_ultra.add_trace(go.Scatter(x=c_x, y=[kutu_taban, kutu_taban], line=dict(color='#2ECC71', width=1.5, dash='dot'), name="Aşağı Tetik Hattı"), row=1, col=1)
 
-            # Alt İndikatör Paneli (Hatasız Sabit RSI)
+            # Alt İndikatör Paneli (Geçmişe uyumlu RSI)
             fig_ultra.add_trace(go.Scatter(x=df_m.index, y=[rsi_fx]*len(df_m), line=dict(color='#16A085', width=1.5), name="RSI (14)"), row=2, col=1)
             fig_ultra.add_shape(type="line", x0=df_m.index[0], y0=50, x1=df_m.index[-1], y1=50, line=dict(color="gray", dash="dash"), row=2, col=1)
             
-            # =================================================================================
             # 🔓 GRAFİĞİ SERBEST BIRAKAN HASSAS YAPILANDIRMA PANELİ
-            # =================================================================================
             fig_ultra.update_layout(
                 height=650,
                 template="plotly_white",
                 xaxis_rangeslider_visible=False,
                 margin=dict(l=10, r=10, t=10, b=10),
                 legend=dict(orientation="h", y=1.05, x=0),
-                
-                dragmode="pan",  # Sürükleme modunu doğrudan el ile tutmaya ayarladık
-                
-            # Eksen kilitlerini kaldırıyoruz (Yukarı, aşağı, sağa, sola serbest salınım)
+                dragmode="pan",
                 xaxis=dict(fixedrange=False),
                 yaxis=dict(fixedrange=False),
                 xaxis2=dict(fixedrange=False),
@@ -1307,11 +1308,7 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
             st.plotly_chart(
                 fig_ultra, 
                 use_container_width=True, 
-                config={
-                    'scrollZoom': True,      # Fare tekerleği veya çift parmakla serbest zoom yapar
-                    'displayModeBar': True,  # Üst panel kontrol çubuğunu açar
-                    'modeBarButtonsToRemove': ['select2d', 'lasso2d'] # Arayüzü sadeleştirir
-                }
+                config={'scrollZoom': True, 'displayModeBar': True, 'modeBarButtonsToRemove': ['select2d', 'lasso2d']}
             )
 
             # 🎯 STRATEJİK HEDEF MATRİSİ CARD ALANI
@@ -1332,4 +1329,5 @@ elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
                 s3.write(f"📦 Kutu Genişlik Oranı: %{oransal_genislik:.2f}")
                 
     except Exception as e:
+        st.warning("Veriler işlenirken anlık bir senkronizasyon gecikmesi oldu. Grafik güncelleniyor...")
         st.warning("Veriler işlenirken anlık bir senkronizasyon gecikmesi oldu...")
