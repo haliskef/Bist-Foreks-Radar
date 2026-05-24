@@ -986,8 +986,8 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                     st.session_state[state_sinyal_key] = anlik_algoritma_yonu
                     st.session_state[state_fiyat_key] = son_fiyat
                     
-                    hedef_tp = son_fiyat + (atr_val * 3.0) if anlik_algoritma_yonu == "LONG (YUKARI)" else son_fiyat - (atr_val * 3.0)
-                    risk_sl = son_fiyat - (atr_val * 1.5) if anlik_algoritma_yonu == "LONG (YUKARI)" else son_fiyat + (atr_val * 1.5)
+                    hedef_tp = son_fiyat + (atr_val * 2.0) if anlik_algoritma_yonu == "LONG (YUKARI)" else son_fiyat - (atr_val * 2.0)
+                    risk_sl = son_fiyat - (atr_val * 1) if anlik_algoritma_yonu == "LONG (YUKARI)" else son_fiyat + (atr_val * 1)
                     skor_val = long_skor if anlik_algoritma_yonu == "LONG (YUKARI)" else short_skor
                     emoji = "🚀" if anlik_algoritma_yonu == "LONG (YUKARI)" else "💥"
                     
@@ -1015,11 +1015,11 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                     if strateji_yonu == "LONG (YUKARI)":
                         ana_skor = long_skor; durum_color = "#2ECC71"; sinyal_tetik_fiyati = st.session_state[state_fiyat_key]
                         durum_msg = f"🚀 GÜÇLÜ BOĞA - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN SİNYAL SABİTLENDİ"
-                        sl_noktasi = sinyal_tetik_fiyati - (atr_val * 1.5); tp_noktasi = sinyal_tetik_fiyati + (atr_val * 3.0)
+                        sl_noktasi = sinyal_tetik_fiyati - (atr_val * 1); tp_noktasi = sinyal_tetik_fiyati + (atr_val * 2.0)
                     elif strateji_yonu == "SHORT (AŞAĞI)":
                         ana_skor = short_skor; durum_color = "#E74C3C"; sinyal_tetik_fiyati = st.session_state[state_fiyat_key]
                         durum_msg = f"💥 GÜÇLÜ AYI - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN AÇIĞA SATIŞ SABİTLENDİ"
-                        sl_noktasi = sinyal_tetik_fiyati + (atr_val * 1.5); tp_noktasi = sinyal_tetik_fiyati - (atr_val * 3.0)
+                        sl_noktasi = sinyal_tetik_fiyati + (atr_val * 1); tp_noktasi = sinyal_tetik_fiyati - (atr_val * 2.0)
                     else:
                         ana_skor = max(long_skor, short_skor); durum_color = "#F1C40F"; sinyal_tetik_fiyati = son_fiyat
                         durum_msg = "🟡 TEST BÖLGESİ - BELİRLİ BİR SEVİYE KIRILIMI BEKLENİYOR"
