@@ -60,7 +60,7 @@ with st.sidebar:
         "Radar (BIST 100 Full Hibrit Tarama)",
         "Forex & Küresel Piyasalar (Çift Yönlü)",
         "Ultra FXMatik (Quant Matrix)"
-        
+    ]
 {
         "ONS ALTIN": "GC=F",
         "ONS GÜMÜŞ": "SI=F",
