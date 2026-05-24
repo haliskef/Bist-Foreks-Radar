@@ -60,6 +60,7 @@ with st.sidebar:
         "Radar (BIST 100 Full Hibrit Tarama)",
         "Forex & Küresel Piyasalar (Çift Yönlü)",
         "Ultra FXMatik (Quant Matrix)"
+        
 {
         "ONS ALTIN": "GC=F",
         "ONS GÜMÜŞ": "SI=F",
@@ -1102,7 +1103,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
 # =================================================================================
 # ÇEKİRDEK 4: ULTRA FXMATİK (QUANT MATRIX) - DİNAMİK RENKLİ VE SERBEST GRAFİKLİ MOTOR
 # =================================================================================
-elif calisma_modu == "Ultra FXMatik (Quant Matrix)":
+elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
     st.markdown("## 🦅 ULTRA FXMATİK (QUANT MATRIX COMPASS)")
     st.markdown("---")
     
