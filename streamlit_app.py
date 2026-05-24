@@ -72,6 +72,7 @@ forex_assets = {
     "ONS PALADYUM": "PA=F",
     "ONS PLATİN": "PL=F",
     "BRENT PETROL": "BZ=F",
+    "WTI HAM PETROL": "CL=F",
     "EUR/USD": "EURUSD=X",
     "GBP/USD": "GBPUSD=X",
     "USD/JPY": "USDJPY=X",
@@ -1117,6 +1118,9 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
         makro_evren = {
             "ONS ALTIN": "GC=F",
             "ONS GÜMÜŞ": "SI=F",
+            "ONS BAKIR" : "HG=F",
+            "ONS PALADYUM": "PA=F",
+            "ONS PLATİN": "PL=F",
             "WTI HAM PETROL": "CL=F",
             "BRENT PETROL": "BZ=F",
             "EUR / USD": "EURUSD=X",
@@ -1124,7 +1128,13 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
             "USD / JPY": "USDJPY=X",
             "AUD / USD": "AUDUSD=X",
             "USD / CAD": "USDCAD=X",
-            "USD / CHF": "USDCHF=X"
+            "USD / CHF": "USDCHF=X",
+            "S&P 500": "^GSPC",
+            "NASDAQ 100": "^NDX",
+            "DXY (Dolar Endeksi)": "DX-Y.NYB",
+            "DAX 40 (Almanya)": "^GDAXI",
+            "ETH/USD": "ETH-USD",
+            "BTC/USD": "BTC-USD"
         }
         
         fx_secilen = st.selectbox("ANALİZ EDİLECEK ENSTRÜMAN", list(makro_evren.keys()), index=0)
