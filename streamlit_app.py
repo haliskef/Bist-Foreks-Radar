@@ -59,31 +59,29 @@ with st.sidebar:
         "Lazer (Detaylı Analiz & Strateji)", 
         "Radar (BIST 100 Full Hibrit Tarama)",
         "Forex & Küresel Piyasalar (Çift Yönlü)",
-        "Ultra FXMatik (Quant Matrix)",
-    
-{
-        "ONS ALTIN": "GC=F",
-        "ONS GÜMÜŞ": "SI=F",
-        "ONS BAKIR" : "HG=F",
-        "ONS PALADYUM": "PA=F",
-        "ONS PLATİN": "PL=F",
-        "BRENT PETROL": "BZ=F",
-        "EUR/USD": "EURUSD=X",
-        "GBP/USD": "GBPUSD=X",
-        "USD/JPY": "USDJPY=X",
-        "S&P 500": "^GSPC",
-        "NASDAQ 100": "^NDX",
-        "DXY (Dolar Endeksi)": "DX-Y.NYB",
-        "DAX 40 (Almanya)": "^GDAXI",
-        "ETH/USD": "ETH-USD",
-        "BTC/USD": "BTC-USD"
-
-} 
-
-
+        "Ultra FXMatik (Quant Matrix)"
         
     ])
     st.markdown("---")
+    
+        # FOREX VE KÜRESEL PİYASALAR SÖZLÜĞÜ
+forex_assets = {
+    "ONS ALTIN": "GC=F",
+    "ONS GÜMÜŞ": "SI=F",
+    "ONS BAKIR" : "HG=F",
+    "ONS PALADYUM": "PA=F",
+    "ONS PLATİN": "PL=F",
+    "BRENT PETROL": "BZ=F",
+    "EUR/USD": "EURUSD=X",
+    "GBP/USD": "GBPUSD=X",
+    "USD/JPY": "USDJPY=X",
+    "S&P 500": "^GSPC",
+    "NASDAQ 100": "^NDX",
+    "DXY (Dolar Endeksi)": "DX-Y.NYB",
+    "DAX 40 (Almanya)": "^GDAXI",
+    "ETH/USD": "ETH-USD",
+    "BTC/USD": "BTC-USD"
+    }
 
 # =================================================================================
 # =================================================================================
