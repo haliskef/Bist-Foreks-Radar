@@ -1181,22 +1181,39 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             if state_sinyal_key not in st.session_state: st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
             if state_fiyat_key not in st.session_state: st.session_state[state_fiyat_key] = 0.0
             
-            # Korumalı ve önbellekli fonksiyon çağrısı
+            # Önbellekli güvenli veri çekme fonksiyonu
             df_fx = get_yahoo_clean_data(asset_ticker)
                 
             if not df_fx.empty and len(df_fx) > 25:
+                # --- VERİ YAPISAL ARINDIRMA REFORMU (KESİN ÇÖZÜM) ---
+                # Eğer veri MultiIndex (iç içe geçmiş) sütun yapısıyla geldiyse düzleştiriyoruz
                 if isinstance(df_fx.columns, pd.MultiIndex): 
                     df_fx.columns = df_fx.columns.get_level_values(0)
+                
+                # Sütun isimlerindeki boşlukları temizle ve ilk harflerini büyüt
                 df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
                 
-                if hasattr(df_fx['Open'], 'columns') or (type(df_fx['Open']).__name__ == 'DataFrame'): df_fx['Open'] = df_fx['Open'].iloc[:, 0]
-                if hasattr(df_fx['High'], 'columns') or (type(df_fx['High']).__name__ == 'DataFrame'): df_fx['High'] = df_fx['High'].iloc[:, 0]
-                if hasattr(df_fx['Low'], 'columns') or (type(df_fx['Low']).__name__ == 'DataFrame'): df_fx['Low'] = df_fx['Low'].iloc[:, 0]
-                if hasattr(df_fx['Close'], 'columns') or (type(df_fx['Close']).__name__ == 'DataFrame'): df_fx['Close'] = df_fx['Close'].iloc[:, 0]
+                # Yahoo bazen veriyi DataFrame serisi olarak çoklu döndürebilir.
+                # Her bir temel sütunun tekil bir pandas Series olmasını mutlak olarak garanti ediyoruz:
+                try:
+                    for col in ['Open', 'High', 'Low', 'Close']:
+                        if col in df_fx.columns:
+                            # Eğer sütun bir DataFrame ise sadece ilk sütununu alıp Series'e çeviriyoruz
+                            if isinstance(df_fx[col], pd.DataFrame):
+                                df_fx[col] = df_fx[col].iloc[:, 0]
+                            # Veri tipinin float/sayısal olmasını zorunlu kılıyoruz
+                            df_fx[col] = pd.to_numeric(df_fx[col], errors='coerce')
+                except Exception as e:
+                    st.error(f"Sütun dönüştürme hatası ({asset_adi}): {e}")
+                    continue
+                
+                # Eksik (NaN) veriler varsa üstteki verilerle dolduruyoruz ki indikatörler patlamasın
+                df_fx = df_fx.ffill().bfill()
                 
                 # 🏃 1. DİNAMİK/YÜRÜYEN SEVİYELER (Momentum Takibi - Son 15 Mum)
                 df_fx['Direnç_S1'] = df_fx['High'].rolling(window=15).max().shift(1)
                 df_fx['Destek_D1'] = df_fx['Low'].rolling(window=15).min().shift(1)
+                # ... (Buradan sonrası indikatör hesaplamaların ve grafik çizim kodlarınla aynen devam edecek)
                 
                 # 🏛️ 2. ASIL SABİT PSİKOLOJİK KALELER (Geniş Zamanlı Klasik Pivot Kümesi)
                 gecmis_high = df_fx['High'].tail(24).max()
