@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 import time
 import os
+import requests
 
 
 # ==========================================
@@ -1180,39 +1181,22 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             if state_sinyal_key not in st.session_state: st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
             if state_fiyat_key not in st.session_state: st.session_state[state_fiyat_key] = 0.0
             
-            # Önbellekli güvenli veri çekme fonksiyonu
+            # Korumalı ve önbellekli fonksiyon çağrısı
             df_fx = get_yahoo_clean_data(asset_ticker)
                 
             if not df_fx.empty and len(df_fx) > 25:
-                # --- VERİ YAPISAL ARINDIRMA REFORMU (KESİN ÇÖZÜM) ---
-                # Eğer veri MultiIndex (iç içe geçmiş) sütun yapısıyla geldiyse düzleştiriyoruz
                 if isinstance(df_fx.columns, pd.MultiIndex): 
                     df_fx.columns = df_fx.columns.get_level_values(0)
-                
-                # Sütun isimlerindeki boşlukları temizle ve ilk harflerini büyüt
                 df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
                 
-                # Yahoo bazen veriyi DataFrame serisi olarak çoklu döndürebilir.
-                # Her bir temel sütunun tekil bir pandas Series olmasını mutlak olarak garanti ediyoruz:
-                try:
-                    for col in ['Open', 'High', 'Low', 'Close']:
-                        if col in df_fx.columns:
-                            # Eğer sütun bir DataFrame ise sadece ilk sütununu alıp Series'e çeviriyoruz
-                            if isinstance(df_fx[col], pd.DataFrame):
-                                df_fx[col] = df_fx[col].iloc[:, 0]
-                            # Veri tipinin float/sayısal olmasını zorunlu kılıyoruz
-                            df_fx[col] = pd.to_numeric(df_fx[col], errors='coerce')
-                except Exception as e:
-                    st.error(f"Sütun dönüştürme hatası ({asset_adi}): {e}")
-                    continue
-                
-                # Eksik (NaN) veriler varsa üstteki verilerle dolduruyoruz ki indikatörler patlamasın
-                df_fx = df_fx.ffill().bfill()
+                if hasattr(df_fx['Open'], 'columns') or (type(df_fx['Open']).__name__ == 'DataFrame'): df_fx['Open'] = df_fx['Open'].iloc[:, 0]
+                if hasattr(df_fx['High'], 'columns') or (type(df_fx['High']).__name__ == 'DataFrame'): df_fx['High'] = df_fx['High'].iloc[:, 0]
+                if hasattr(df_fx['Low'], 'columns') or (type(df_fx['Low']).__name__ == 'DataFrame'): df_fx['Low'] = df_fx['Low'].iloc[:, 0]
+                if hasattr(df_fx['Close'], 'columns') or (type(df_fx['Close']).__name__ == 'DataFrame'): df_fx['Close'] = df_fx['Close'].iloc[:, 0]
                 
                 # 🏃 1. DİNAMİK/YÜRÜYEN SEVİYELER (Momentum Takibi - Son 15 Mum)
                 df_fx['Direnç_S1'] = df_fx['High'].rolling(window=15).max().shift(1)
                 df_fx['Destek_D1'] = df_fx['Low'].rolling(window=15).min().shift(1)
-                # ... (Buradan sonrası indikatör hesaplamaların ve grafik çizim kodlarınla aynen devam edecek)
                 
                 # 🏛️ 2. ASIL SABİT PSİKOLOJİK KALELER (Geniş Zamanlı Klasik Pivot Kümesi)
                 gecmis_high = df_fx['High'].tail(24).max()
@@ -1427,77 +1411,20 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                         st.info(f"**🏰 Ana Güvenlik Üssü (Destek):** `{asıl_destek_kale:.4f}`")
 
                     with sag_p:
-                        # =================================================================================
-                        # 🛡️ GRAFİK VERİ ARINDIRMA VE İNDEKS KORUMA KALKANI
-                        # =================================================================================
-                        df_plot_clean = df_fx.copy()
-
-                        # İndeksi Plotly'nin en sevdiği saf datetime formatına zorluyoruz
-                        df_plot_clean.index = pd.to_datetime(df_plot_clean.index)
-
-                        # Tüm kritik fiyat sütunlarının tekil birer serisi (Series) olduğunu garanti ediyoruz
-                        for col in ['Open', 'High', 'Low', 'Close', 'Direnç_S1', 'Destek_D1', 'box_ust', 'box_alt', 'EMA21', 'EMA50']:
-                            if col in df_plot_clean.columns:
-                                if isinstance(df_plot_clean[col], pd.DataFrame):
-                                    df_plot_clean[col] = df_plot_clean[col].iloc[:, 0]
-                                df_plot_clean[col] = pd.to_numeric(df_plot_clean[col], errors='coerce')
-
-                        # Boş kalan satırları dolduruyoruz ki grafik kesintiye uğramasın
-                        df_plot_clean = df_plot_clean.ffill().bfill()
-
-                        # =================================================================================
-                        # 📈 ÇİFT YÖNLÜ GRAFİK VE HEDEF HARİTASI (PLOTLY ENGINE)
-                        # =================================================================================
                         st.markdown("### 📈 Çift Yönlü Grafik ve Hedef Haritası")
                         fig_fx = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.7, 0.3])
-
-                        # Saf Mum Grafiği
-                        fig_fx.add_trace(go.Candlestick(
-                            x=df_plot_clean.index, 
-                            open=df_plot_clean['Open'], 
-                            high=df_plot_clean['High'], 
-                            low=df_plot_clean['Low'], 
-                            close=df_plot_clean['Close'], 
-                            name="Fiyat"
-                        ), row=1, col=1)
-
-                        # 🏰 ASIL SABİT KALELER (Liste çarpımı yerine numpy ile doğrudan array basılıyor - Hatayı Bitirir)
-                        fig_fx.add_trace(go.Scatter(
-                            x=df_plot_clean.index, 
-                            y=np.full(len(df_plot_clean), float(asıl_direnc_kale)), 
-                            line=dict(color='#8B0000', width=3.5, dash='solid'), 
-                            name="🏰 ASIL DİRENÇ KALESİ"
-                        ), row=1, col=1)
-
-                        fig_fx.add_trace(go.Scatter(
-                            x=df_plot_clean.index, 
-                            y=np.full(len(df_plot_clean), float(asıl_destek_kale)), 
-                            line=dict(color='#006400', width=3.5, dash='solid'), 
-                            name="🏰 ASIL DESTEK KALESİ"
-                        ), row=1, col=1)
-
-                        # 🏃 YÜRÜYEN MOMENTUM SEVİYELERİ
-                        fig_fx.add_trace(go.Scatter(x=df_plot_clean.index, y=df_plot_clean['Direnç_S1'], line=dict(color='#C0392B', width=1.5, dash='dot'), name="🏃 Yürüyen Direnç"), row=1, col=1)
-                        fig_fx.add_trace(go.Scatter(x=df_plot_clean.index, y=df_plot_clean['Destek_D1'], line=dict(color='#27AE60', width=1.5, dash='dot'), name="🏃 Yürüyen Destek"), row=1, col=1)
-
-                        # 🔮 KRİSTAL BOX VE TREND ORTALAMALARI
-                        fig_fx.add_trace(go.Scatter(x=df_plot_clean.index, y=df_plot_clean['box_ust'], line=dict(color='#8E44AD', width=1.2, dash='dash'), name="Box Üst"), row=1, col=1)
-                        fig_fx.add_trace(go.Scatter(x=df_plot_clean.index, y=df_plot_clean['box_alt'], line=dict(color='#8E44AD', width=1.2, dash='dash'), name="Box Alt"), row=1, col=1)
-                        fig_fx.add_trace(go.Scatter(x=df_plot_clean.index, y=df_plot_clean['EMA21'], line=dict(color='#E67E22', width=1.0), name="EMA 21"), row=1, col=1)
-                        fig_fx.add_trace(go.Scatter(x=df_plot_clean.index, y=df_plot_clean['EMA50'], line=dict(color='#3498DB', width=1.0), name="EMA 50"), row=1, col=1)
-
-                        # 🌊 ALT PANEL: QUANT RSI
-                        if 'RSI' in df_plot_clean.columns:
-                            fig_fx.add_trace(go.Scatter(x=df_plot_clean.index, y=df_plot_clean['RSI'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
-                        elif 'RSI_FX' in df_plot_clean.columns:
-                            fig_fx.add_trace(go.Scatter(x=df_plot_clean.index, y=df_plot_clean['RSI_FX'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
-
-                        fig_fx.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-                        fig_fx.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
-
-                        # Düzen ayarları ve ekrana basma kamçısı
-                        fig_fx.update_layout(height=580, template="plotly_white", xaxis_rangeslider_visible=False, margin=dict(l=10, r=10, t=10, b=10), hovermode="x unified")
-                        st.plotly_chart(fig_fx, use_container_width=True)
+                        fig_fx.add_trace(go.Candlestick(x=df_fx.index, open=df_fx['Open'], high=df_fx['High'], low=df_fx['Low'], close=df_fx['Close'], name="Fiyat"), row=1, col=1)
+                        
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=[asıl_direnc_kale]*len(df_fx), line=dict(color='#8B0000', width=3.5, dash='solid'), name="🏰 ASIL DİRENÇ KALESİ"), row=1, col=1)
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=[asıl_destek_kale]*len(df_fx), line=dict(color='#006400', width=3.5, dash='solid'), name="🏰 ASIL DESTEK KALESİ"), row=1, col=1)
+                        
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['Direnç_S1'], line=dict(color='#C0392B', width=1.5, dash='dot'), name="🏃 Yürüyen Direnç"), row=1, col=1)
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['Destek_D1'], line=dict(color='#27AE60', width=1.5, dash='dot'), name="🏃 Yürüyen Destek"), row=1, col=1)
+                        
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_ust'], line=dict(color='#8E44AD', width=1.2, dash='dash'), name="Box Üst"), row=1, col=1)
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_alt'], line=dict(color='#8E44AD', width=1.2, dash='dash'), name="Box Alt"), row=1, col=1)
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA21'], line=dict(color='#E67E22', width=1.0), name="EMA 21"), row=1, col=1)
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA50'], line=dict(color='#3498DB', width=1.0), name="EMA 50"), row=1, col=1)
                         
                         if strateji_yonu != "NÖTR (İZLE)":
                             fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[tp_noktasi, tp_noktasi], line=dict(color='#2ECC71', width=2.5), name="Hedef (TP)"), row=1, col=1)
