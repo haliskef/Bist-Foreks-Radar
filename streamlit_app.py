@@ -754,26 +754,6 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 # ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (TAM OTONOM ÇOKLU ENSTRÜMAN RADARI - ASIL SABİT DESTEK/DİRENÇLİ)
 # =================================================================================
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
-    import datetime
-    
-    # 🗓️ 1. HAFTA SONU VE PİYASA KAPANIŞ KİLİDİ (ESKİ VERİ VE YALAN SİNYAL ENGELLEYİCİ)
-    simdi = datetime.datetime.now()
-    haftanin_gunu = simdi.weekday() # 0=Pazartesi, 4=Cuma, 5=Cumartesi, 6=Pazar
-    saat = simdi.hour
-    
-    piyasa_kapali = False
-    if haftanin_gunu == 5 or haftanin_gunu == 6: # Cumartesi veya Pazar
-        piyasa_kapali = True
-    elif haftanin_gunu == 4 and saat >= 23: # Cuma gecesi 23:00 sonrası
-        piyasa_kapali = True
-    elif haftanin_gunu == 0 and saat < 1: # Pazartesi gece yarısı açılış öncesi
-        piyasa_kapali = True
-
-    if piyasa_kapali:
-        st.warning("💤 Küresel Piyasalar Hafta Sonu Arasına Girmiştir. Eski verilerin dönmesini ve yalan sinyal üretimini engellemek için akış Pazartesi açılışına kadar durduruldu.")
-        st.stop()
-
-    # Piyasa açıksa 1 dakikada bir sayfayı yeniler
     st_autorefresh(interval=60000, key="global_forex_multi_scan_v15_final_sabit_kaleler")
     st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ (TÜM LİSTE ARKA PLANDA TARANIYOR)")
     
@@ -793,15 +773,6 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 requests.post(url, json=payload, timeout=5)
             except Exception as e:
                 pass 
-
-    # 🛡️ YAHOO BLOCK ENGELLEYİCİ AKILLI ÖNBELLEK MOTORU
-    @st.cache_data(ttl=300, show_spinner=False)
-    def get_yahoo_clean_data(ticker):
-        try:
-            df = yf.download(tickers=ticker, period="1mo", interval="1h", progress=False)
-            return df
-        except:
-            return pd.DataFrame()
 
     # SEKMELİ YAPI (Grafik Paneli ve Geniş Haber Paneli Ayrımı)
     fx_tab1, fx_tab2 = st.tabs(["📊 Otonom Teknik Analiz & PA", "📅 Canlı Ekonomik Takvim & Makro Etki"])
@@ -843,38 +814,43 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 payload = {"chat_id": TELEGRAM_CHAT_ID, "text": "🎯 *SİSTEM TESTİ BAŞARILI!*\n\nAsıl Sabit Kaleli çoklu tarama modunda Telegram hattınız aktiftir.", "parse_mode": "Markdown"}
                 response = requests.post(url, json=payload, timeout=5)
                 if response.status_code == 200: st.success("🎯 Harika! Mesaj başarıyla gönderildi. Telefonunu kontrol et.")
-                else: st.error(f"❌ Telegram API Hata Dönürdü: {response.text}")
+                else: st.error(f"❌ Telegram API Hata Döndürdü: {response.text}")
             except Exception as e: st.error(f"🚨 Sunucu/Ağ Bağlantı Hatası: {e}")
 
         st.info("🔄 **7/24 Arka Plan Tarayıcısı Aktif:** Grafik üzerinde kalın düz çizgiler ASIL SABİT kaleleri, kesikli ince çizgiler ise yürüyen anlık momentum seviyelerini gösterir.")
         
+        # Ekranda detaylarını, nedenlerini ve grafiğini görmek istediğin enstrüman seçimi
         secilen_forex_adi = st.selectbox("Ekranda Detaylı İncelemek İstediğiniz Küresel Enstrüman:", list(forex_assets.keys()))
+        
+        # Sırlama hatasını engellemek için listeyi en başta boş küme olarak sağlama alıyoruz
         sonuclar = []
 
         # 🤖 OTONOM ÇOKLU TARAMA DÖNGÜSÜ
         for asset_adi, asset_ticker in forex_assets.items():
             
+            # Her enstrüman için bağımsız hafıza alanı kilitliyoruz
             state_sinyal_key = f"fx_state_yon_{asset_adi}"
             state_fiyat_key = f"fx_lock_price_{asset_adi}"
             
             if state_sinyal_key not in st.session_state: st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
             if state_fiyat_key not in st.session_state: st.session_state[state_fiyat_key] = 0.0
             
-            # Önbellekli güvenli veri çekme fonksiyonu
-            df_fx = get_yahoo_clean_data(asset_ticker)
+            try:
+                df_fx = yf.download(tickers=asset_ticker, period="1mo", interval="1h", progress=False)
+            except:
+                continue
                 
             if not df_fx.empty and len(df_fx) > 25:
-                # --- SÜTUN DÜZLEŞTİRME VE YAPISAL ARINDIRMA REFORMU ---
+                # --- ÇOK KATMANLI VERİ YAPISINI (USA/FOREX) KESİN DÜZLEŞTİRME KORUMASI ---
                 if isinstance(df_fx.columns, pd.MultiIndex): 
                     df_fx.columns = df_fx.columns.get_level_values(0)
-                
-                # Sütun isimlerini tamamen standart formata zorluyoruz (Gereksiz döngü patlamalarını bitirir)
                 df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns]
                 
-                # Sütunların seri (Series) olmasını mutlak olarak garanti altına alıyoruz
-                for col in ['Open', 'High', 'Low', 'Close']:
-                    if isinstance(df_fx[col], pd.DataFrame):
-                        df_fx[col] = df_fx[col].iloc[:, 0]
+                # Sütunların DataFrame mi yoksa Series mi olduğunu hatasız çözen yeni zırh katmanı
+                if hasattr(df_fx['Open'], 'columns') or (type(df_fx['Open']).__name__ == 'DataFrame'): df_fx['Open'] = df_fx['Open'].iloc[:, 0]
+                if hasattr(df_fx['High'], 'columns') or (type(df_fx['High']).__name__ == 'DataFrame'): df_fx['High'] = df_fx['High'].iloc[:, 0]
+                if hasattr(df_fx['Low'], 'columns') or (type(df_fx['Low']).__name__ == 'DataFrame'): df_fx['Low'] = df_fx['Low'].iloc[:, 0]
+                if hasattr(df_fx['Close'], 'columns') or (type(df_fx['Close']).__name__ == 'DataFrame'): df_fx['Close'] = df_fx['Close'].iloc[:, 0]
                 
                 # 🏃 1. DİNAMİK/YÜRÜYEN SEVİYELER (Momentum Takibi - Son 15 Mum)
                 df_fx['Direnç_S1'] = df_fx['High'].rolling(window=15).max().shift(1)
@@ -883,7 +859,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 # 🏛️ 2. ASIL SABİT PSİKOLOJİK KALELER (Geniş Zamanlı Klasik Pivot Kümesi)
                 gecmis_high = df_fx['High'].tail(24).max()
                 gecmis_low = df_fx['Low'].tail(24).min()
-                gecmis_close = df_fx['Close'].tail(24).mean()
+                gecmis_close = df_fx['Close'].tail(24).mean() # Gürültüyü engellemek için ortalama denge noktası
                 
                 sabit_pivot = (gecmis_high + gecmis_low + gecmis_close) / 3
                 asıl_direnc_kale = (2 * sabit_pivot) - gecmis_low
@@ -949,7 +925,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 is_msb_bullish = son_fiyat > son_ekstrem_zirve
                 is_msb_bearish = son_fiyat < son_ekstrem_dip
 
-                # 6. ÇİFT YÖNLÜ KARAR MOTORU
+                # 6. ÇİFT YÖNLÜ KARAR MOTORU (HIBRIIT DESTEK/DİRENÇ ENTEGRELİ)
                 long_skor = 0.0
                 short_skor = 0.0
                 nedenler = []
@@ -961,11 +937,13 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 else:
                     long_skor += 0.5; short_skor += 0.5; nedenler.append("🟨 KRİSTAL BOX: Fiyat kutu içinde konsolide oluyor (Nötr +0.5)")
                 
+                # Yürüyen Seviye Tetik Kontrolleri (+1.0)
                 if son_fiyat > yuruyen_direnc:
                     long_skor += 1.0; nedenler.append(f"🎯 MOMENTUM: {yuruyen_direnc:.4f} Anlık Direnci yukarı aşıldı (Long +1.0)")
                 elif son_fiyat < yuruyen_destek:
                     short_skor += 1.0; nedenler.append(f"🎯 MOMENTUM: {yuruyen_destek:.4f} Anlık Desteği aşağı yönlü patladı (Short +1.0)")
                 
+                # 🏛️ ASIL SABİT KALE KONTROLÜ (Ekstra Güven Onayı +1.0)
                 if son_fiyat > asıl_direnc_kale:
                     long_skor += 1.0; nedenler.append(f"🏰 ASIL KALE YIKILDI: {asıl_direnc_kale:.4f} Sabit Ana Direnci yukarı geçildi! (Long +1.0)")
                 elif son_fiyat < asıl_destek_kale:
@@ -998,13 +976,13 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 if long_skor >= 7.0 and long_skor >= short_skor: anlik_algoritma_yonu = "LONG (YUKARI)"
                 elif short_skor >= 7.0 and short_skor > long_skor: anlik_algoritma_yonu = "SHORT (AŞAĞI)"
 
+                # Listeye ana sayfada sıralanabilmesi için sonuçları ekliyoruz
                 hibrit_hesap = max(long_skor, short_skor)
                 sonuclar.append({
                     "Enstrüman": asset_adi, "Anlık Fiyat": son_fiyat, "Yön": anlik_algoritma_yonu,
                     "Long Skor": long_skor, "Short Skor": short_skor, "Hibrit Skor": hibrit_hesap, "RSI": rsi_val
                 })
 
-                # AKILLI BELLEK KİLİTLEME VE 1'E 2 HEDEF KONTROLÜ (SL: 1.0 ATR | TP: 2.0
                 # AKILLI BELLEK KİLİTLEME & ARKA PLAN TELEGRAM BİLDİRİM TETİKLEYİCİ
                 if anlik_algoritma_yonu != "NÖTR (İZLE)" and st.session_state[state_sinyal_key] == "NÖTR (İZLE)":
                     st.session_state[state_sinyal_key] = anlik_algoritma_yonu
