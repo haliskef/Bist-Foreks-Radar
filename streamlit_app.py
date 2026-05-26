@@ -13,11 +13,10 @@ import requests
 # ==========================================
 # 1. SAYFA AYARLARI VE ARAYÜZ TASARIMI
 # ==========================================
-st.set_page_config(
-    page_title="BIST & KÜRESEL HİBRİT KOMUTA MERKEZİ",
+st.set_page_config(page_title="BIST & KÜRESEL HİBRİT KOMUTA MERKEZİ",
     layout="wide",                       # Geniş ekran modu
     initial_sidebar_state="collapsed"    # Telefonda sidebar gizli başlar!
-
+)
 # UI/UX OPTİMİZASYONU
 st.markdown("""
     <style>
