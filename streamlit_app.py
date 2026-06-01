@@ -1261,6 +1261,15 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
             # Row heights ile fiyat alanını iyice genişletiyoruz (%80 fiyat, %20 RSI)
             fig_ultra = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.8, 0.2])
 
+             # 📈 Gelişmiş Plotly Çizim Alanı
+            fig_ultra = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.78, 0.22])
+            
+            # Mum Grafik Konturu
+            fig_ultra.add_trace(go.Candlestick(
+                x=df_m.index, open=df_m['Open'], high=df_m['High'], low=df_m['Low'], close=df_m['Close'],
+                name=fx_secilen, increasing_line_color='#2ECC71', decreasing_line_color='#E74C3C'
+            ), row=1, col=1)
+
             # Profesyonel Renk Paletiyle Mum Grafiği
             fig_ultra.add_trace(go.Candlestick(
                 x=df_m.index, 
