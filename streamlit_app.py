@@ -1287,7 +1287,13 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
             # Alt İndikatör Paneli (Hatasız Sabit RSI)
             fig_ultra.add_trace(go.Scatter(x=df_m.index, y=[rsi_fx]*len(df_m), line=dict(color='#16A085', width=1.5), name="RSI (14)"), row=2, col=1)
             fig_ultra.add_shape(type="line", x0=df_m.index[0], y0=50, x1=df_m.index[-1], y1=50, line=dict(color="gray", dash="dash"), row=2, col=1)
-            
+          # 🎯 HAFTA SONU BOŞLUKLARINI YOK EDEN SİHİRLİ SENSÖR (RANGEBREAKS)
+            fig_ultra.update_xaxes(
+                rangebreaks=[
+                    dict(bounds=["sat", "mon"]), # Cumartesi 00:00 ile Pazartesi 00:00 arasını grafikten tamamen siler!
+                ]
+            )
+
             # =================================================================================
             # 🔓 GRAFİĞİ SERBEST BIRAKAN HASSAS YAPILANDIRMA PANELİ
             # =================================================================================
