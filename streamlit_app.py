@@ -1243,7 +1243,17 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
                 tp_hedef = kutu_tavan
                 sl_stop = kutu_taban
 
-                        # =================================================================================
+            # 📊 SİSTEM GÖSTERGE PANELİ
+            st.markdown(f"<div style='background-color:{kart_renk};color:white;padding:14px;border-radius:6px;text-align:center;font-weight:bold;font-size:16px;'>{durum_text}</div>", unsafe_allow_html=True)
+            st.write("")
+            
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("GÜNCEL FİYAT", f"{son_fiyat:.4f}")
+            m2.metric("📦 KUTU TAVANI (DİRENÇ)", f"{kutu_tavan:.4f}")
+            m3.metric("📦 KUTU TABANI (DESTEK)", f"{kutu_taban:.4f}")
+            m4.metric("📊 KANAL YAPISI", "DAR KANAL (ALARM)" if is_dar_kanal else "NORMAL KORİDOR")
+
+            # =================================================================================
             # 🛡️ ULTRA FXMATİK (QUANT MATRIX) JİLET GİBİ NET GRAFİK MOTORU (PLOTLY FIXED)
             # =================================================================================
             st.markdown("### 📈 Ultra Quant Dinamik Grafik Sistemi")
