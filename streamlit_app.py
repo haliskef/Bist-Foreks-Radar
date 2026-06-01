@@ -1099,7 +1099,6 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             st.dataframe(df_sonuc, use_container_width=True)
 # =================================================================================
 # =================================================================================
-# =================================================================================
 # ÇEKİRDEK 4: ULTRA FXMATİK (QUANT MATRIX) - DİNAMİK RENKLİ VE SERBEST GRAFİKLİ MOTOR
 # =================================================================================
 elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
@@ -1253,15 +1252,7 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
             m3.metric("📦 KUTU TABANI (DESTEK)", f"{kutu_taban:.4f}")
             m4.metric("📊 KANAL YAPISI", "DAR KANAL (ALARM)" if is_dar_kanal else "NORMAL KORİDOR")
 
-            # =================================================================================
-            # 🛡️ ULTRA FXMATİK (QUANT MATRIX) JİLET GİBİ NET GRAFİK MOTORU (PLOTLY FIXED)
-            # =================================================================================
-            st.markdown("### 📈 Ultra Quant Dinamik Grafik Sistemi")
-            
-            # Row heights ile fiyat alanını iyice genişletiyoruz (%80 fiyat, %20 RSI)
-            fig_ultra = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.03, row_heights=[0.8, 0.2])
-
-             # 📈 Gelişmiş Plotly Çizim Alanı
+            # 📈 Gelişmiş Plotly Çizim Alanı
             fig_ultra = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.78, 0.22])
             
             # Mum Grafik Konturu
@@ -1269,70 +1260,62 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
                 x=df_m.index, open=df_m['Open'], high=df_m['High'], low=df_m['Low'], close=df_m['Close'],
                 name=fx_secilen, increasing_line_color='#2ECC71', decreasing_line_color='#E74C3C'
             ), row=1, col=1)
+            
+            # Kristal Kutu Sınır Hatları
+            fig_ultra.add_trace(go.Scatter(x=[df_m.index[0], df_m.index[-1]], y=[kutu_tavan, kutu_tavan], line=dict(color=kanal_grafik_rengi, width=kanal_kalinligi), name="Kutu Direnç Sınırı"), row=1, col=1)
+            fig_ultra.add_trace(go.Scatter(x=[df_m.index[0], df_m.index[-1]], y=[kutu_taban, kutu_taban], line=dict(color=kanal_grafik_rengi, width=kanal_kalinligi), name="Kutu Destek Sınırı"), row=1, col=1)
+            fig_ultra.add_trace(go.Scatter(x=[df_m.index[0], df_m.index[-1]], y=[kutu_merkez, kutu_merkez], line=dict(color='#7F8C8D', width=1, dash='dot'), name="Merkez Denge Ekseni"), row=1, col=1)
 
-            # Profesyonel Renk Paletiyle Mum Grafiği
-            fig_ultra.add_trace(go.Candlestick(
-                x=df_m.index, 
-                open=df_m['Open'], 
-                high=df_m['High'], 
-                low=df_m['Low'], 
-                close=df_m['Close'], 
-                name="Fiyat",
-                increasing_line_color='#26a69a', increasing_fillcolor='#26a69a', # TradingView Yeşili
-                decreasing_line_color='#ef5350', decreasing_fillcolor='#ef5350'  # TradingView Kırmızısı
-            ), row=1, col=1)
-
-            # 🔮 KRİSTAL BOX / KANALLAR VE ORTALAMALAR (Fiyat paneline oturur)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=df_m['box_ust_m'], line=dict(color='#8E44AD', width=1.2, dash='dash'), name="Kutu Tavanı"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=df_m['box_alt_m'], line=dict(color='#8E44AD', width=1.2, dash='dash'), name="Kutu Tabanı"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=df_m['kutu_orta_m'], line=dict(color='#BDC3C7', width=1, dash='dot'), name="Denge Ekseni"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=df_m['EMA21_m'], line=dict(color='#E67E22', width=1.2), name="EMA 21"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=df_m['EMA50_m'], line=dict(color='#3498DB', width=1.2), name="EMA 50"), row=1, col=1)
-
-            # 📐 GANN AÇISAL PROJEKSİYONLARI (Fiyat paneline oturur)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 2.0 * x_idx), line=dict(color='#E74C3C', width=1, dash='dash'), name="Gann 2x1 (Hızlı Al)"), row=1, col=1)
+            # Gann Tayfı Geometrisi
+            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 2.0 * x_idx), line=dict(color='#9B59B6', width=1, dash='dash'), name="Gann 2x1 (İvme)"), row=1, col=1)
             fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 1.0 * x_idx), line=dict(color='#3498DB', width=1.5), name="Gann 1x1 (Ana Denge)"), row=1, col=1)
             fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 0.5 * x_idx), line=dict(color='#1ABC9C', width=1, dash='dash'), name="Gann 1x2 (Yavaş)"), row=1, col=1)
 
-            # 🎯 STRATEJİK ÇIKIŞ HEDEFLERİ (Dinamik TP/SL İğneleri)
+            # Duruma Göre Sağ Uca Fırlayan Dinamik Çıkış (TP/SL) Çizgileri
             c_x = [df_m.index[-15], df_m.index[-1]]
-            fig_ultra.add_trace(go.Scatter(x=c_x, y=[tp_hedef, tp_hedef], line=dict(color='#27AE60', width=3, dash='solid'), name="Hedef (TP)"), row=1, col=1)
-            fig_ultra.add_trace(go.Scatter(x=c_x, y=[sl_stop, sl_stop], line=dict(color='#C0392B', width=3, dash='solid'), name="Stop (SL)"), row=1, col=1)
+            
+            if "GÜÇLÜ BOĞA" in durum_text or "GÜÇLÜ AYI" in durum_text:
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[tp_hedef, tp_hedef], line=dict(color='#2ECC71', width=3.5, dash='solid'), name="Hedef (TP)"), row=1, col=1)
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[sl_stop, sl_stop], line=dict(color='#D50000', width=3.5, dash='solid'), name="Zarar Kes (SL)"), row=1, col=1)
+            elif "YALANCI KIRILIM" in durum_text:
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[tp_hedef, tp_hedef], line=dict(color='#9B59B6', width=2.5, dash='dot'), name="Tuzak Dönüş Hedefi"), row=1, col=1)
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[sl_stop, sl_stop], line=dict(color='#7F8C8D', width=2.5, dash='dash'), name="Tuzak Risk Limiti"), row=1, col=1)
+            else:
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[kutu_tavan, kutu_tavan], line=dict(color='#E74C3C', width=1.5, dash='dot'), name="Yukarı Tetik Hattı"), row=1, col=1)
+                fig_ultra.add_trace(go.Scatter(x=c_x, y=[kutu_taban, kutu_taban], line=dict(color='#2ECC71', width=1.5, dash='dot'), name="Aşağı Tetik Hattı"), row=1, col=1)
 
-            # 🌊 ALT PANEL (ROW 2): RSI BURAYA TAMAMEN İZOLE EDİLDİ (Fiyat mumlarını asla sıkıştırmaz)
-            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=np.full(len(df_m), rsi_fx), line=dict(color='purple', width=1.5), name="Quant RSI"), row=2, col=1)
-            fig_ultra.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-            fig_ultra.add_hline(y=50, line_dash="dot", line_color="gray", row=2, col=1)
-            fig_ultra.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
-
-            # 🎯 HAFTA SONU BOŞLUKLARINI YOK EDEN SİHİRLİ SENSÖR
-            fig_ultra.update_xaxes(
-                rangebreaks=[
-                    dict(bounds=["sat", "mon"]), # Cumartesi 00:00 ile Pazartesi 00:00 arasındaki tüm boş veri alanlarını kesip atar!
-                ],
-                showspikes=True, spikemode="across", spikedash="dot"
-            )
-
-            # TradingView Kalitesinde Arayüz Mizanpajı
+            # Alt İndikatör Paneli (Hatasız Sabit RSI)
+            fig_ultra.add_trace(go.Scatter(x=df_m.index, y=[rsi_fx]*len(df_m), line=dict(color='#16A085', width=1.5), name="RSI (14)"), row=2, col=1)
+            fig_ultra.add_shape(type="line", x0=df_m.index[0], y0=50, x1=df_m.index[-1], y1=50, line=dict(color="gray", dash="dash"), row=2, col=1)
+            
+            # =================================================================================
+            # 🔓 GRAFİĞİ SERBEST BIRAKAN HASSAS YAPILANDIRMA PANELİ
+            # =================================================================================
             fig_ultra.update_layout(
-                height=650, 
-                template="plotly_white", 
-                xaxis_rangeslider_visible=False, 
-                margin=dict(l=10, r=10, t=10, b=10), 
-                hovermode="x unified"
+                height=650,
+                template="plotly_white",
+                xaxis_rangeslider_visible=False,
+                margin=dict(l=10, r=10, t=10, b=10),
+                legend=dict(orientation="h", y=1.05, x=0),
+                
+                dragmode="pan",  # Sürükleme modunu doğrudan el ile tutmaya ayarladık
+                
+                # Eksen kilitlerini kaldırıyoruz (Yukarı, aşağı, sağa, sola serbest salınım)
+                xaxis=dict(fixedrange=False),
+                yaxis=dict(fixedrange=False),
+                xaxis2=dict(fixedrange=False),
+                yaxis2=dict(fixedrange=False)
             )
-
-            # Serbest yakınlaştırma ve kontrol çubuğu aktif şekilde ekrana basma
+            
             st.plotly_chart(
                 fig_ultra, 
                 use_container_width=True, 
                 config={
-                    'scrollZoom': True,      # Fare tekerleğiyle serbest zoom yapar
-                    'displayModeBar': True,  # Kontrol çubuğunu açar
-                    'modeBarButtonsToRemove': ['select2d', 'lasso2d']
+                    'scrollZoom': True,      # Fare tekerleği veya çift parmakla serbest zoom yapar
+                    'displayModeBar': True,  # Üst panel kontrol çubuğunu açar
+                    'modeBarButtonsToRemove': ['select2d', 'lasso2d'] # Arayüzü sadeleştirir
                 }
             )
-
 
             # 🎯 STRATEJİK HEDEF MATRİSİ CARD ALANI
             st.markdown("### 🏹 QUANT STRATEJİ KARTI")
