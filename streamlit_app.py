@@ -1255,10 +1255,12 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
             # 📈 Gelişmiş Plotly Çizim Alanı
             fig_ultra = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.78, 0.22])
             
-            # Mum Grafik Konturu
+          # Profesyonel Mum Grafik Konturu
             fig_ultra.add_trace(go.Candlestick(
                 x=df_m.index, open=df_m['Open'], high=df_m['High'], low=df_m['Low'], close=df_m['Close'],
-                name=fx_secilen, increasing_line_color='#2ECC71', decreasing_line_color='#E74C3C'
+                name=fx_secilen, 
+                increasing_line_color='#26a69a', increasing_fillcolor='#26a69a', # TradingView Yeşili
+                decreasing_line_color='#ef5350', decreasing_fillcolor='#ef5350'  # TradingView Kırmızısı
             ), row=1, col=1)
             
             # Kristal Kutu Sınır Hatları
@@ -1271,9 +1273,8 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
             fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 1.0 * x_idx), line=dict(color='#3498DB', width=1.5), name="Gann 1x1 (Ana Denge)"), row=1, col=1)
             fig_ultra.add_trace(go.Scatter(x=df_m.index, y=kutu_taban + (fiyat_adim_katsayisi * 0.5 * x_idx), line=dict(color='#1ABC9C', width=1, dash='dash'), name="Gann 1x2 (Yavaş)"), row=1, col=1)
 
-            # Duruma Göre Sağ Uca Fırlayan Dinamik Çıkış (TP/SL) Çizgileri
+            # Duruma Göre Dinamik Çıkış (TP/SL) Çizgileri
             c_x = [df_m.index[-15], df_m.index[-1]]
-            
             if "GÜÇLÜ BOĞA" in durum_text or "GÜÇLÜ AYI" in durum_text:
                 fig_ultra.add_trace(go.Scatter(x=c_x, y=[tp_hedef, tp_hedef], line=dict(color='#2ECC71', width=3.5, dash='solid'), name="Hedef (TP)"), row=1, col=1)
                 fig_ultra.add_trace(go.Scatter(x=c_x, y=[sl_stop, sl_stop], line=dict(color='#D50000', width=3.5, dash='solid'), name="Zarar Kes (SL)"), row=1, col=1)
@@ -1294,35 +1295,45 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
                 ]
             )
 
+        
             # =================================================================================
-            # 🔓 GRAFİĞİ SERBEST BIRAKAN HASSAS YAPILANDIRMA PANELİ
+            # 🔓 SERBEST ZOOM, GERÇEK ZAMANLI SAĞ EKSEN VE İZLEME TEKNOLOJİSİ
             # =================================================================================
             fig_ultra.update_layout(
-                height=650,
+                height=670,
                 template="plotly_white",
                 xaxis_rangeslider_visible=False,
-                margin=dict(l=10, r=10, t=10, b=10),
+                margin=dict(l=10, r=60, t=10, b=10), # Sağ eksen değerleri rahat okunsun diye payı artırdık
                 legend=dict(orientation="h", y=1.05, x=0),
                 
-                dragmode="pan",  # Sürükleme modunu doğrudan el ile tutmaya ayarladık
-                
-                # Eksen kilitlerini kaldırıyoruz (Yukarı, aşağı, sağa, sola serbest salınım)
-                xaxis=dict(fixedrange=False),
-                yaxis=dict(fixedrange=False),
+                # Sürükleme ve eksen serbestliği ayarları (Yaklaşmayı kilitlemez)
+                dragmode="zoom", 
+                xaxis=dict(fixedrange=False, showspikes=True, spikemode="across", spikedash="dot", spikethickness=1),
+                yaxis=dict(
+                    fixedrange=False, 
+                    side="right", # Fiyat eksenini tamamen sağ tarafa alarak TradingView tasarımı yapıyoruz
+                    showspikes=True, 
+                    spikemode="across", 
+                    spikedash="dot",
+                    spikethickness=1
+                ),
                 xaxis2=dict(fixedrange=False),
-                yaxis2=dict(fixedrange=False)
+                yaxis2=dict(fixedrange=False, side="right"),
+                
+                # Fare imlecinin değdiği yerdeki tüm enstrüman fiyatlarını sağ eksende yapışık gösterir
+                hovermode="x unified"
             )
             
+            # Kodun Streamlit katmanında fare tekerleğiyle ileri geri zoom yapmasını tetikliyoruz
             st.plotly_chart(
                 fig_ultra, 
                 use_container_width=True, 
                 config={
-                    'scrollZoom': True,      # Fare tekerleği veya çift parmakla serbest zoom yapar
-                    'displayModeBar': True,  # Üst panel kontrol çubuğunu açar
-                    'modeBarButtonsToRemove': ['select2d', 'lasso2d'] # Arayüzü sadeleştirir
+                    'scrollZoom': True,         # 🚀 FARE TEKERLEĞİ İLE İLERİ GERİ YAKINLAŞMA AKTİF!
+                    'displayModeBar': True,     # Grafik üstündeki kontrol çubuğunu açar
+                    'modeBarButtonsToRemove': ['select2d', 'lasso2d']
                 }
             )
-
             # 🎯 STRATEJİK HEDEF MATRİSİ CARD ALANI
             st.markdown("### 🏹 QUANT STRATEJİ KARTI")
             s1, s2, s3 = st.columns(3)
