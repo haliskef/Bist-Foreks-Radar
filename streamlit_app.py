@@ -1298,22 +1298,23 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
         
             # =================================================================================
             # =================================================================================
+           # =================================================================================
+            # =================================================================================
             # 🔓 SERBEST ZOOM, GERÇEK ZAMANLI SAĞ EKSEN VE İZLEME TEKNOLOJİSİ
             # =================================================================================
             fig_ultra.update_layout(
                 height=670,
                 template="plotly_white",
                 xaxis_rangeslider_visible=False,
-                margin=dict(l=10, r=60, t=10, b=10),
+                margin=dict(l=10, r=60, t=10, b=10), # Sağ eksen değerleri rahat okunsun diye payı artırdık
                 legend=dict(orientation="h", y=1.05, x=0),
                 
+                # Sürükleme ve eksen serbestliği ayarları (Yaklaşmayı kilitlemez)
                 dragmode="zoom", 
                 xaxis=dict(fixedrange=False, showspikes=True, spikemode="across", spikedash="dot", spikethickness=1),
-                
-                # 🎯 SAĞ EKSENDE ANLIK ETİKETLERİ VE MUM DEĞERLERİNİ AÇAN SİHİRLİ AYARLAR
                 yaxis=dict(
                     fixedrange=False, 
-                    side="right", 
+                    side="right", # Fiyat eksenini tamamen sağ tarafa alarak TradingView tasarımı yapıyoruz
                     showspikes=True, 
                     spikemode="across", 
                     spikedash="dot",
@@ -1322,8 +1323,17 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
                 xaxis2=dict(fixedrange=False),
                 yaxis2=dict(fixedrange=False, side="right"),
                 
-                # 🚀 Fareyi muma değdirince hem kutu sınırları sağda yazsın hem de mumun High/Low değerleri fırlasın
-                hovermode="x" 
+                # Fare imlecinin değdiği yerdeki tüm enstrüman fiyatlarını sağ eksende yapışık gösterir
+                hovermode="x unified"
             )
-                
-   
+            
+            # Kodun Streamlit katmanında fare tekerleğiyle ileri geri zoom yapmasını tetikliyoruz
+            st.plotly_chart(
+                fig_ultra, 
+                use_container_width=True, 
+                config={
+                    'scrollZoom': True,         # 🚀 FARE TEKERLEĞİ İLE İLERİ GERİ YAKINLAŞMA AKTİF!
+                    'displayModeBar': True,     # Grafik üstündeki kontrol çubuğunu açar
+                    'modeBarButtonsToRemove': ['select2d', 'lasso2d']
+                }
+            )
