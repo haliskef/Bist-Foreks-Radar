@@ -1297,21 +1297,23 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
 
         
             # =================================================================================
+            # =================================================================================
             # 🔓 SERBEST ZOOM, GERÇEK ZAMANLI SAĞ EKSEN VE İZLEME TEKNOLOJİSİ
             # =================================================================================
             fig_ultra.update_layout(
                 height=670,
                 template="plotly_white",
                 xaxis_rangeslider_visible=False,
-                margin=dict(l=10, r=60, t=10, b=10), # Sağ eksen değerleri rahat okunsun diye payı artırdık
+                margin=dict(l=10, r=60, t=10, b=10),
                 legend=dict(orientation="h", y=1.05, x=0),
                 
-                # Sürükleme ve eksen serbestliği ayarları (Yaklaşmayı kilitlemez)
                 dragmode="zoom", 
                 xaxis=dict(fixedrange=False, showspikes=True, spikemode="across", spikedash="dot", spikethickness=1),
+                
+                # 🎯 SAĞ EKSENDE ANLIK ETİKETLERİ VE MUM DEĞERLERİNİ AÇAN SİHİRLİ AYARLAR
                 yaxis=dict(
                     fixedrange=False, 
-                    side="right", # Fiyat eksenini tamamen sağ tarafa alarak TradingView tasarımı yapıyoruz
+                    side="right", 
                     showspikes=True, 
                     spikemode="across", 
                     spikedash="dot",
@@ -1320,36 +1322,8 @@ elif calisma_modu ==  "Ultra FXMatik (Quant Matrix)":
                 xaxis2=dict(fixedrange=False),
                 yaxis2=dict(fixedrange=False, side="right"),
                 
-                # Fare imlecinin değdiği yerdeki tüm enstrüman fiyatlarını sağ eksende yapışık gösterir
-                hovermode="x unified"
+                # 🚀 Fareyi muma değdirince hem kutu sınırları sağda yazsın hem de mumun High/Low değerleri fırlasın
+                hovermode="x" 
             )
-            
-            # Kodun Streamlit katmanında fare tekerleğiyle ileri geri zoom yapmasını tetikliyoruz
-            st.plotly_chart(
-                fig_ultra, 
-                use_container_width=True, 
-                config={
-                    'scrollZoom': True,         # 🚀 FARE TEKERLEĞİ İLE İLERİ GERİ YAKINLAŞMA AKTİF!
-                    'displayModeBar': True,     # Grafik üstündeki kontrol çubuğunu açar
-                    'modeBarButtonsToRemove': ['select2d', 'lasso2d']
-                }
-            )
-            # 🎯 STRATEJİK HEDEF MATRİSİ CARD ALANI
-            st.markdown("### 🏹 QUANT STRATEJİ KARTI")
-            s1, s2, s3 = st.columns(3)
-            
-            if "GÜÇLÜ BOĞA" in durum_text or "GÜÇLÜ AYI" in durum_text:
-                s1.success(f"🎯 **Kâr Al (TP) Seviyesi:** {tp_hedef:.4f}")
-                s2.error(f"🛑 **Zarar Kes (SL) Seviyesi:** {sl_stop:.4f}")
-                s3.info(f"⚖️ **Trend İvme Skoru:** {hiz_skoru}")
-            elif "YALANCI KIRILIM" in durum_text:
-                s1.warning("⚠️ İşleme Girme! (Tuzak Aktif)")
-                s2.info(f"🔄 Kutu İçi Geri Çekilme Hedefi: {tp_hedef:.4f}")
-                s3.write(f"RSI Seviyesi: {rsi_fx:.1f}")
-            else:
-                s1.info(f"⚡ Üst Sınır Geçilirse (AL): {kutu_tavan:.4f}")
-                s2.info(f"⚡ Alt Sınır Patlarsa (SAT): {kutu_taban:.4f}")
-                s3.write(f"📦 Kutu Genişlik Oranı: %{oransal_genislik:.2f}")
                 
-    except Exception as e:
-        st.warning("Veriler işlenirken anlık bir senkronizasyon gecikmesi oldu. Grafik güncelleniyor...")
+   
