@@ -750,8 +750,6 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 # =================================================================================
 # =================================================================================
 # =================================================================================
-# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (TAM OTONOM ÇOKLU ENSTRÜMAN RADARI - ASIL SABİT DESTEK/DİRENÇLİ)
-# =================================================================================
 # =================================================================================
 # 🚀 ANLIK CANLI VERİ ENJEKTÖRÜ (YAHOO REALTIME ENDPOINT)
 # =================================================================================
@@ -791,6 +789,13 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
     except:
         pass
     return pd.DataFrame()
+
+# =================================================================================
+# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (ASIL KODUNUN BAŞLADIĞI YER)
+# =================================================================================
+# =================================================================================
+# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (TAM OTONOM ÇOKLU ENSTRÜMAN RADARI - ASIL SABİT DESTEK/DİRENÇLİ)
+# =================================================================================
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
     st_autorefresh(interval=15000, key="global_forex_multi_scan_v15_final_sabit_kaleler")
     st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ (TÜM LİSTE ARKA PLANDA TARANIYOR)")
