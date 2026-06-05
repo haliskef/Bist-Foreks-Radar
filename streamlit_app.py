@@ -751,17 +751,6 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 # =================================================================================
 # ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (TAM OTONOM ÇOKLU ENSTRÜMAN RADARI - ASIL SABİT DESTEK/DİRENÇLİ)
 # =================================================================================
-# ---------------------------------------------------------------------------------
-    # 🛡️ ÇEKİRDEK 3: FOREKS CANLI VERİ ENJEKTÖRÜ (GECİKMESİZ AKIŞ)
-    # ---------------------------------------------------------------------------------
-    # yfinance kütüphanesinin 15 dk gecikmesini aşmak için doğrudan canlı tünele soruyoruz
-    df_m = get_realtime_data_direct(ticker_sembol, periyot_kod)
-
-    if df_m.empty or len(df_m) < 5:
-        st.warning("Foreks canlı veri sunucusuna bağlanılıyor, lütfen bekleyin...")
-    else:
-        # Kodun geri kalan tüm matematiksel hesaplamaları (kutu_tavan, Gann tayfı, RSI) 
-        # bu canlı gelen 'df_m' üzerinden milisaniyelik olarak hesaplanmaya devam eder.
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
     st_autorefresh(interval=60000, key="global_forex_multi_scan_v15_final_sabit_kaleler")
     st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ (TÜM LİSTE ARKA PLANDA TARANIYOR)")
