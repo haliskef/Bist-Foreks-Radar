@@ -833,10 +833,8 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             if state_sinyal_key not in st.session_state: st.session_state[state_sinyal_key] = "NÖTR (İZLE)"
             if state_fiyat_key not in st.session_state: st.session_state[state_fiyat_key] = 0.0
             
-            try:
-                df_fx = yf.download(tickers=asset_ticker, period="1mo", interval="1h", progress=False)
-            except:
-                continue
+            # 🛰️ GECİKMESİZ FOREKS ANLIK VERİ ENJEKTÖRÜ AKTİF
+            df_fx = get_realtime_data_direct(asset_ticker, "1h")
                 
             if not df_fx.empty and len(df_fx) > 25:
                 # --- ÇOK KATMANLI VERİ YAPISINI (USA/FOREX) KESİN DÜZLEŞTİRME KORUMASI ---
