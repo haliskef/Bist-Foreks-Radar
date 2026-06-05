@@ -746,7 +746,51 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
             return ''
         styled_df = st.session_state.hibrit_tablo_full.style.map(renk_motoru, subset=['Sistem Notu'])
         st.dataframe(styled_df, use_container_width=True, height=800)
+# =================================================================================
+# 🚀 ANLIK CANLI VERİ ENJEKTÖRÜ (YAHOO REALTIME ENDPOINT)
+# =================================================================================
+def get_realtime_data_direct(ticker_sembol, interval_kod):
+    """
+    Kütüphane gecikmelerini atlayarak doğrudan Yahoo Canlı Veri sunucularına
+    bağlanır ve anlığa en yakın dataframe çıktısını üretir.
+    """
+    import requests
+    import pandas as pd
+    
+    range_map = {"15m": "5d", "1h": "30d", "1d": "2y"}
+    sure_kilit = range_map.get(interval_kod, "2y")
+    
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_sembol}"
+    params = {"range": sure_kilit, "interval": interval_kod, "includePrePost": "false"}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    
+    try:
+        req = requests.get(url, params=params, headers=headers, timeout=10)
+        if req.status_code == 200:
+            json_data = req.json()
+            result = json_data['chart']['result'][0]
+            timestamps = result['timestamp']
+            indicators = result['indicators']['quote'][0]
+            
+            df_rt = pd.DataFrame({
+                'Open': indicators['open'],
+                'High': indicators['high'],
+                'Low': indicators['low'],
+                'Close': indicators['close'],
+                'Volume': indicators['volume']
+            }, index=pd.to_datetime(timestamps, unit='s'))
+            
+            df_rt.dropna(subset=['Close'], inplace=True)
+            return df_rt
+    except:
+        pass
+    return pd.DataFrame()
 
+# =================================================================================
+# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (ASIL KODUNUN BAŞLADIĞI YER)
+# =================================================================================
+elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
+    # ... senin mevcut kodların aynen devam ediyor ...
 # =================================================================================
 # =================================================================================
 # ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (TAM OTONOM ÇOKLU ENSTRÜMAN RADARI - ASIL SABİT DESTEK/DİRENÇLİ)
