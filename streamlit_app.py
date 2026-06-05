@@ -8,6 +8,8 @@ import numpy as np
 import time
 import os
 import requests
+
+# =================================================================================
 # 🚀 HIZLI CANLI VERİ MOTORU (YAHOO REALTIME ENDPOINT - KÜRESEL SÜRÜM)
 # =================================================================================
 def get_realtime_data_direct(ticker_sembol, interval_kod):
@@ -63,13 +65,16 @@ st.markdown("""
     .stMetric { background-color: #FFFFFF !important; padding: 10px 5px !important; border-radius: 10px !important; border: 1px solid #CCCCCC !important; box-shadow: 2px 2px 5px rgba(0,0,0,0.05) !important; }
     
     [data-testid="stMetricLabel"], [data-testid="stMetricLabel"] > div { 
-        color: #555555 !important; font-weight: 800 !important; white-space: normal !important; 
+        color: #555555 !important;
+        font-weight: 800 !important; white-space: normal !important; 
         word-wrap: break-word !important; overflow: visible !important; text-overflow: clip !important; 
-        font-size: 0.75rem !important; line-height: 1.2 !important;
+        font-size: 0.75rem !important;
+        line-height: 1.2 !important;
     }
     
     [data-testid="stMetricValue"], [data-testid="stMetricValue"] > div { 
-        color: #000000 !important; font-weight: 900 !important; font-size: 1.15rem !important; 
+        color: #000000 !important;
+        font-weight: 900 !important; font-size: 1.15rem !important; 
         white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
     }
     
@@ -97,11 +102,10 @@ with st.sidebar:
         "Radar (BIST 100 Full Hibrit Tarama)",
         "Forex & Küresel Piyasalar (Çift Yönlü)",
         "Ultra FXMatik (Quant Matrix)"
-        
     ])
     st.markdown("---")
     
-        # FOREX VE KÜRESEL PİYASALAR SÖZLÜĞÜ
+# 🔥 BOZUK OLAN LİSTE SOLA SIFIRLANDI VE SÖZDİZİMİ DÜZELTİLDİ
 forex_assets = {
     "ONS ALTIN": "GC=F",
     "ONS GÜMÜŞ": "SI=F",
@@ -119,7 +123,10 @@ forex_assets = {
     "DAX 40 (Almanya)": "^GDAXI",
     "ETH/USD": "ETH-USD",
     "BTC/USD": "BTC-USD"
-    }
+}
+
+# Kodun bundan sonra gelen "if calisma_modu == 'Lazer (Detaylı Analiz & Strateji)':" 
+# kısmı ve altındaki tüm modlar (Çekirdek 1, 2, 3) aynen devam edecek.    }
 
 # =================================================================================
 # =================================================================================
