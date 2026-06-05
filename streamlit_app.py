@@ -791,9 +791,6 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
     return pd.DataFrame()
 
 # =================================================================================
-# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (ASIL KODUNUN BAŞLADIĞI YER)
-# =================================================================================
-# =================================================================================
 # ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (TAM OTONOM ÇOKLU ENSTRÜMAN RADARI - ASIL SABİT DESTEK/DİRENÇLİ)
 # =================================================================================
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
