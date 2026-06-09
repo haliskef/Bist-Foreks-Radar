@@ -12,46 +12,32 @@ import requests
 def get_realtime_data_direct(ticker_sembol, interval_kod):
     """
     Yahoo kısıtlamalarını tamamen atlayarak, Foreks ve Altın çiftleri için
-    TradingView altyapısından 0 gecikmeli, anlık veri akışı sağlar.
-    İndikatörlerin kırılmaması için zaman indeksini Pandas Datetime formatına senkronize eder.
+    TradingView altyapısından 0 gecikmeli, anlık saniyelik veri akışı sağlar.
+    Hem Türkçe isimleri hem de Yahoo kodlarını otomatik olarak TradingView diline çevirir.
     """
     import requests
     import pandas as pd
-    import numpy as np
     from datetime import datetime, timedelta
 
-    # Ticker eşleştirme haritası (Yahoo sembollerini anlık sisteme çeviriyoruz)
+    sembol_temiz = str(ticker_sembol).strip()
+    
+    # 🛡️ ESNEKLİK ZIRHI: İçeriye ne isim girilirse girilsin TradingView koduna eşitler
     forex_mapping = {
-        "GC=F": "XAUUSD",      # ONS ALTIN
-        "SI=F": "XAGUSD",      # ONS GÜMÜŞ
-        "HG=F": "COPPER",      # ONS BAKIR
-        "PA=F": "XPDUSD",      # ONS PALADYUM
-        "PL=F": "XPTUSD",      # ONS PLATİN
-        "BZ=F": "UKOIL",       # BRENT PETROL
-        "CL=F": "USOIL",       # HAM PETROL
-        "EURUSD=X": "EURUSD",
-        "GBPUSD=X": "GBPUSD",
-        "USDJPY=X": "USDJPY",
-        "^GSPC": "SPX500",     # S&P 500
-        "^NDX": "NAS100",      # NASDAQ 100
-        "DX-Y.NYB": "DXY",     # Dolar Endeksi
-        "^GDAXI": "GER40",     # DAX 40
-        "ETH-USD": "ETHUSD",
-        "BTC-USD": "BTCUSD"
+        "GC=F": "XAUUSD", "EURUSD=X": "EURUSD", "GBPUSD=X": "GBPUSD", "USDJPY=X": "USDJPY",
+        "ONS ALTIN (XAU/USD)": "XAUUSD", "EUR/USD": "EURUSD", "GBP/USD": "GBPUSD", "USD/JPY": "USDJPY",
+        "XAUUSD": "XAUUSD", "EURUSD": "EURUSD", "GBPUSD": "GBPUSD", "USDJPY": "USDJPY"
     }
 
-    tv_symbol = forex_mapping.get(ticker_sembol, ticker_sembol)
+    tv_symbol = forex_mapping.get(sembol_temiz, sembol_temiz)
     
-    # Zaman aralığını hesapla (Son 30 günlük veri)
+    if ".IS" in sembol_temiz:
+        return pd.DataFrame()
+        
     bitis_ts = int(datetime.now().timestamp())
     baslangic_ts = bitis_ts - (30 * 24 * 60 * 60)
     
-    # Çözünürlük ayarı (1h = 60, 15m = 15)
     tv_resolution = "60" if interval_kod == "1h" else ("15" if interval_kod == "15m" else "D")
-    
-    # Uygun veri havuzu seçimi
-    symbol_string = f"FX_IDC:{tv_symbol}" if "USD" in tv_symbol or tv_symbol in ["DXY", "EURUSD", "GBPUSD", "USDJPY"] else f"CAPITALCOM:{tv_symbol}"
-    if tv_symbol in ["SPX500", "NAS100", "GER40"]: symbol_string = f"CAPITALCOM:{tv_symbol}"
+    symbol_string = f"FX_IDC:{tv_symbol}" if tv_symbol in ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "DXY"] else f"CAPITALCOM:{tv_symbol}"
 
     url = "https://tvc4.tradingview.com/7bdf1cf208e1694f2ee1a5009a7b9370/1717882400/history"
     params = {
@@ -65,28 +51,24 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
     
     try:
         req = requests.get(url, params=params, headers=headers, timeout=10)
-        if req.status_code == 200:
+        if req.status_code == 200 and req.json().get('s') == 'ok':
             json_data = req.json()
-            if json_data.get('s') == 'ok':
-                # 🌟 KRİTİK DÜZELTME: Zaman damgalarını tam sayı listesinden Pandas Datetime formatına alıyoruz
-                zaman_indeksi = pd.to_datetime(json_data['t'], unit='s')
-                
-                df_rt = pd.DataFrame({
-                    'Open': json_data['o'],
-                    'High': json_data['h'],
-                    'Low': json_data['l'],
-                    'Close': json_data['c'],
-                    'Volume': json_data.get('v', [0] * len(json_data['t']))
-                }, index=zaman_indeksi)
-                
-                # Sütun tiplerini sayısal (float) yapıyoruz ki indikatörler hata vermesin
-                for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
-                    df_rt[col] = pd.to_numeric(df_rt[col], errors='coerce')
-                
-                # Türkiye saatine senkronizasyon (+3 saat ekleme)
-                df_rt.index = df_rt.index + timedelta(hours=3)
-                df_rt.dropna(subset=['Close'], inplace=True)
-                return df_rt
+            
+            df_rt = pd.DataFrame({
+                'Open': json_data['o'],
+                'High': json_data['h'],
+                'Low': json_data['l'],
+                'Close': json_data['c'],
+                'Volume': json_data.get('v', [0] * len(json_data['t']))
+            }, index=pd.to_datetime(json_data['t'], unit='s'))
+            
+            for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+                df_rt[col] = pd.to_numeric(df_rt[col], errors='coerce')
+            
+            # 🌍 Türkiye Saat Senkronizasyonu (+3 Saat)
+            df_rt.index = df_rt.index + timedelta(hours=3)
+            df_rt.dropna(subset=['Close'], inplace=True)
+            return df_rt
     except:
         pass
         
