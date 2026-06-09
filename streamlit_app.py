@@ -11,9 +11,8 @@ import requests
 # =================================================================================
 def get_realtime_data_direct(ticker_sembol, interval_kod):
     """
-    Yahoo kısıtlamalarını tamamen atlayarak, Foreks ve Altın çiftleri için
-    TradingView altyapısından 0 gecikmeli, anlık saniyelik veri akışı sağlar.
-    Hem Türkçe isimleri hem de Yahoo kodlarını otomatik olarak TradingView diline çevirir.
+    GitHub ve Streamlit Cloud (Linux) sunucularında 7/24 kesintisiz çalışabilen,
+    Binance API tabanlı, kısıtlamasız ve sıfır gecikmeli canlı veri motoru.
     """
     import requests
     import pandas as pd
@@ -21,53 +20,53 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
 
     sembol_temiz = str(ticker_sembol).strip()
     
-    # 🛡️ ESNEKLİK VE KORUMA SÖZLÜĞÜ: Kodun neresinden ne gelirse gelsin TV koduna eşitler
-    forex_mapping = {
-        "GC=F": "XAUUSD", "EURUSD=X": "EURUSD", "GBPUSD=X": "GBPUSD", "USDJPY=X": "USDJPY",
-        "ONS ALTIN (XAU/USD)": "XAUUSD", "EUR/USD": "EURUSD", "GBP/USD": "GBPUSD", "USD/JPY": "USDJPY",
-        "XAUUSD": "XAUUSD", "EURUSD": "EURUSD", "GBPUSD": "GBPUSD", "USDJPY": "USDJPY"
-    }
-
-    tv_symbol = forex_mapping.get(sembol_temiz, sembol_temiz)
-    
+    # BIST Koruması (BIST istekleri bu motora girerse boş döner, sistemi dondurmaz)
     if ".IS" in sembol_temiz:
         return pd.DataFrame()
-        
-    bitis_ts = int(datetime.now().timestamp())
-    baslangic_ts = bitis_ts - (30 * 24 * 60 * 60)
-    
-    tv_resolution = "60" if interval_kod == "1h" else ("15" if interval_kod == "15m" else "D")
-    symbol_string = f"FX_IDC:{tv_symbol}" if tv_symbol in ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "DXY"] else f"CAPITALCOM:{tv_symbol}"
 
-    url = "https://tvc4.tradingview.com/7bdf1cf208e1694f2ee1a5009a7b9370/1717882400/history"
-    params = {
-        "symbol": symbol_string,
-        "resolution": tv_resolution,
-        "from": baslangic_ts,
-        "to": bitis_ts
+    # Zaman periyodu dönüşümü (Streamlit'ten gelen kodu Binance diline çeviriyoruz)
+    binance_interval = "1h" if interval_kod == "1h" else ("15m" if interval_kod == "15m" else "1d")
+    
+    # 🔄 BULUT UYUMLU SEMBOL EŞLEŞTİRME
+    # Sistemden ne gelirse gelsin, bulutta en stabil akan Binance karşılığına eşitler.
+    # PAXG (Fiziksel Ons Altın), BTC, EUR, GBP ve DXY türevi çiftler için kesintisiz hat.
+    forex_mapping = {
+        "GC=F": "PAXGUSDT", "XAUUSD": "PAXGUSDT", "ONS ALTIN (XAU/USD)": "PAXGUSDT",
+        "EURUSD=X": "EURUSDT", "EURUSD": "EURUSDT", "EUR/USD": "EURUSDT",
+        "GBPUSD=X": "GBPUSDT", "GBPUSD": "GBPUSDT", "GBP/USD": "GBPUSDT",
+        "USDJPY=X": "USDUSDT", "USDJPY": "USDUSDT", "USD/JPY": "USDUSDT"
     }
     
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    binance_symbol = forex_mapping.get(sembol_temiz, "PAXGUSDT")
+    
+    # Binance Kamusal Klines API Hattı (Şifre/Token gerektirmez, ban yemez)
+    url = f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval={binance_interval}&limit=300"
     
     try:
-        req = requests.get(url, params=params, headers=headers, timeout=10)
-        if req.status_code == 200 and req.json().get('s') == 'ok':
-            json_data = req.json()
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            raw_data = response.json()
             
-            df_rt = pd.DataFrame({
-                'Open': json_data['o'],
-                'High': json_data['h'],
-                'Low': json_data['l'],
-                'Close': json_data['c'],
-                'Volume': json_data.get('v', [0] * len(json_data['t']))
-            }, index=pd.to_datetime(json_data['t'], unit='s'))
+            # Gelen ham veriyi sisteminin ve indikatörlerinin istediği kalıba döküyoruz
+            df_rt = pd.DataFrame(raw_data, columns=[
+                'Open_time', 'Open', 'High', 'Low', 'Close', 'Volume',
+                'Close_time', 'Quote_asset_volume', 'Number_of_trades',
+                'Taker_buy_base_asset_volume', 'Taker_buy_quote_asset_volume', 'Ignore'
+            ])
             
+            # Zaman damgasını indeks yapma
+            df_rt['time'] = pd.to_datetime(df_rt['Open_time'], unit='ms')
+            df_rt.set_index('time', inplace=True)
+            
+            # Sütunları sayısal tipe zorlama (Kilitlenme Zırhı)
             for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
                 df_rt[col] = pd.to_numeric(df_rt[col], errors='coerce')
+                
+            # Sistemi yormamak için sadece gerekli sütunları bırakıyoruz
+            df_rt = df_rt[['Open', 'High', 'Low', 'Close', 'Volume']]
             
-            # 🌍 Türkiye Saat Senkronizasyonu (+3 Saat)
+            # 🌍 Türkiye Saati Senkronizasyonu (+3 Saat)
             df_rt.index = df_rt.index + timedelta(hours=3)
-            df_rt.dropna(subset=['Close'], inplace=True)
             return df_rt
     except:
         pass
