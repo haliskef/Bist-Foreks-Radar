@@ -135,25 +135,24 @@ with st.sidebar:
     ])
     st.markdown("---")
     
-# 🔥 BOZUK OLAN LİSTE SOLA SIFIRLANDI VE SÖZDİZİMİ DÜZELTİLDİ
-forex_assets = {
-    "ONS ALTIN": "GC=F",
-    "ONS GÜMÜŞ": "SI=F",
-    "ONS BAKIR" : "HG=F",
-    "ONS PALADYUM": "PA=F",
-    "ONS PLATİN": "PL=F",
-    "BRENT PETROL": "BZ=F",
-    "WTI HAM PETROL": "CL=F",
-    "EUR/USD": "EURUSD=X",
-    "GBP/USD": "GBPUSD=X",
-    "USD/JPY": "USDJPY=X",
-    "S&P 500": "^GSPC",
-    "NASDAQ 100": "^NDX",
-    "DXY (Dolar Endeksi)": "DX-Y.NYB",
-    "DAX 40 (Almanya)": "^GDAXI",
-    "ETH/USD": "ETH-USD",
-    "BTC/USD": "BTC-USD"
-}
+# 🌐 Gelişmiş Küresel Varlık Listesi (Kripto, Emtia, Forex, Endeksler)
+        # Binance global fiyat akışlarına tam entegre edilmiş kod karşılıkları
+        forex_assets = {
+            "⚡ BITCOIN (BTC/USDT)": "BTCUSDT",
+            "💎 ETHEREUM (ETH/USDT)": "ETHUSDT",
+            "🏆 ONS ALTIN (PAXG/USDT)": "PAXGUSDT",
+            "🥈 ONS GÜMÜŞ (XAGUSDT)": "XAGUSDT",
+            "🥉 BAKIR (COPPERUSDT)": "HGUSDT",
+            "⛓️ PLATİN (XPTUSDT)": "XPTUSDT",
+            "🧲 PALADYUM (XPDUSDT)": "XPDUSDT",
+            "🛢️ BRENT PETROL (OILUSDT)": "USOILUSDT",
+            "🇪🇺 EUR / USD": "EURUSDT",
+            "🇯🇵 USD / JPY": "USDJPY",
+            "🇨🇭 USD / CHF": "USDCHF",
+            "🇦🇺 AUD / USD": "AUDUSDT",
+            "🇺🇸 S&P 500 ENDEKSİ": "SPXUSDT",
+            "📊 NASDAQ 100 ENDEKSİ": "NDAQUSDT"
+        }
 
 # Kodun bundan sonra gelen "if calisma_modu == 'Lazer (Detaylı Analiz & Strateji)':" 
 # kısmı ve altındaki tüm modlar (Çekirdek 1, 2, 3) aynen devam edecek.    }
