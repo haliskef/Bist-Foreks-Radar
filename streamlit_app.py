@@ -902,12 +902,12 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             if state_sinyal_key not in st.session_state: st.session_state[state_sinyal_key] = "NÖTR (İZLE)" # 
             if state_fiyat_key not in st.session_state: st.session_state[state_fiyat_key] = 0.0 # 
             
-            # 🛰️ TRADINGVIEW CANLI MOTORUNDAN VERİ ÇEKİLİYOR
+            # 🛰️ YENİ CANLI MOTORU ÇAĞIRIYORUZ (SAYISAL UYUM SAĞLANDI)
             df_fx = get_realtime_data_direct(asset_ticker, "1h") 
                 
             if not df_fx.empty and len(df_fx) > 25: # 
                 
-                # 🛡️ GÜVENLİK ZIRHI: Sütun tiplerinin float olmasını garanti et (Eski Yahoo çoklu indeks zırhı kalktı)
+                # 🛡️ SÜTUN TİPLERİ SAYISAL HALE GETİRİLİYOR (ESKİ YAHOO TEMİZLEME BLOKLARI KALKTI)
                 for col in ['Open', 'High', 'Low', 'Close']:
                     df_fx[col] = pd.to_numeric(df_fx[col], errors='coerce')
                 
@@ -942,7 +942,8 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 fx_loss = -fx_delta.clip(upper=0) # 
                 fx_avg_gain = fx_gain.ewm(com=13, adjust=False).mean() # 
                 fx_avg_loss = fx_loss.ewm(com=13, adjust=False).mean() # 
-                df_fx['RSI'] = 100 - (100 / (1 + (fx_avg_gain / fx_avg_loss))) # 
+                fx_rs = fx_avg_gain / fx_avg_loss # 
+                df_fx['RSI'] = 100 - (100 / (1 + fx_rs)) # 
                 
                 df_fx['EMA21'] = df_fx['Close'].ewm(span=21, adjust=False).mean() # 
                 df_fx['EMA50'] = df_fx['Close'].ewm(span=50, adjust=False).mean() # 
@@ -1023,7 +1024,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 if is_msb_bullish: long_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Boğa yönlü kırıldı (MSB/CHoCH)") # 
                     
                 if is_bearish_pin: short_skor += 1.0; nedenler.append("❄️ PRICE ACTION: Ayı Pin Bar oluştu") # 
-                if is_bearish_engulfing: short_skor += 1.0; nedenler.append("🔥 PRICE ACTION: Bearish Engulfing görüldü") # 
+                if is_bearish_engulfing: short_skor += 1.0; nedenler.append("❄️ PRICE ACTION: Bearish Engulfing görüldü") # 
                 if is_msb_bearish: short_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Ayı yönlü kırıldı (MSB/CHoCH)") # 
 
                 long_skor = min(10.0, round(long_skor, 1)) # 
@@ -1068,7 +1069,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                     st.session_state[state_sinyal_key] = "NÖTR (İZLE)" # 
                     st.session_state[state_fiyat_key] = 0.0 # 
 
-                # 🖥Header/Kart Gösterimi (Seçili Enstrüman)
+                # 🖥️ EKRANDA DETAYLI GÖRSEL GÖSTERİM (SEÇİLİ ENSTRÜMAN)
                 if asset_adi == secilen_forex_adi: # 
                     strateji_yonu = st.session_state[state_sinyal_key] # 
                     
@@ -1085,6 +1086,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                         durum_msg = "🟡 TEST BÖLGESİ - BELİRLİ BİR SEVİYE KIRILIMI BEKLENİYOR" # 
                         sl_noktasi = son_fiyat - (atr_val * 2.0); tp_noktasi = son_fiyat + (atr_val * 2.0) #
 
+                    # Savaş Kartı Gösterimi
                     st.markdown(f"""
                         <div style="background-color: {durum_color}; padding: 25px; border-radius: 15px; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
                             <h1 style="color: #FFFFFF !important; border: none; margin: 0; font-size: 2.2rem;">{asset_adi} // DETAYLI CANLI MONITOR</h1>
@@ -1105,7 +1107,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                     f4.metric("🎯 OTONOM TP", f"{tp_noktasi:.4f}") # 
                     f5.metric("🛑 OTONOM SL", f"{sl_noktasi:.4f}") # 
 
-                    # PANEL YERLEŞİMİ (Sol Veriler | Sağ Grafik)
+                    # PANEL YERLEŞİMİ (Sol: İstatistikler | Sağ: Gelişmiş Plotly)
                     sol_p, sag_p = st.columns([1, 2]) # 
                     
                     with sol_p:
