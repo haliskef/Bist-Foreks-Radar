@@ -12,8 +12,8 @@ import requests
 def get_realtime_data_direct(ticker_sembol, interval_kod):
     """
     Yahoo kısıtlamalarını tamamen atlayarak, Foreks ve Altın çiftleri için
-    TradingView altyapısından 0 gecikmeli, anlık saniyelik veri akışı sağlar.
-    Hem Türkçe isimleri hem de Yahoo kodlarını otomatik olarak TradingView diline çevirir.
+    TradingView altyapısından 0 gecikmeli, anlık veri akışı sağlar.
+    Hem Türkçe isimleri hem de Yahoo kodlarını otomatik olarak eşleştirir.
     """
     import requests
     import pandas as pd
@@ -21,7 +21,8 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
 
     sembol_temiz = str(ticker_sembol).strip()
     
-    # 🛡️ ESNEKLİK ZIRHI: İçeriye ne isim girilirse girilsin TradingView koduna eşitler
+    # 🛡️ DİĞER MODLARI KORUMA ESNEKLİK SÖZLÜĞÜ
+    # Çekirdek 3 döngüsünden veya sözlükten ne tür parametre gelirse gelsin TradingView koduna çevirir.
     forex_mapping = {
         "GC=F": "XAUUSD", "EURUSD=X": "EURUSD", "GBPUSD=X": "GBPUSD", "USDJPY=X": "USDJPY",
         "ONS ALTIN (XAU/USD)": "XAUUSD", "EUR/USD": "EURUSD", "GBP/USD": "GBPUSD", "USD/JPY": "USDJPY",
@@ -30,14 +31,18 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
 
     tv_symbol = forex_mapping.get(sembol_temiz, sembol_temiz)
     
+    # Eğer kazara araya BIST hissesi karışırsa sistemi dondurmaması için koruma:
     if ".IS" in sembol_temiz:
         return pd.DataFrame()
         
     bitis_ts = int(datetime.now().timestamp())
-    baslangic_ts = bitis_ts - (30 * 24 * 60 * 60)
+    baslangic_ts = bitis_ts - (30 * 24 * 60 * 60) # İndikatörler için son 30 gün yeterlidir
     
+    # Zaman periyodu dönüşümü
     tv_resolution = "60" if interval_kod == "1h" else ("15" if interval_kod == "15m" else "D")
-    symbol_string = f"FX_IDC:{tv_symbol}" if tv_symbol in ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "DXY"] else f"CAPITALCOM:{tv_symbol}"
+    
+    # Güvenli veri havuzu (Spot foreks çiftleri için en temiz grafik havuzu)
+    symbol_string = f"FX_IDC:{tv_symbol}" if tv_symbol in ["XAUUSD", "EURUSD", "GBPUSD", "USDJPY"] else f"CAPITALCOM:{tv_symbol}"
 
     url = "https://tvc4.tradingview.com/7bdf1cf208e1694f2ee1a5009a7b9370/1717882400/history"
     params = {
@@ -54,6 +59,7 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
         if req.status_code == 200 and req.json().get('s') == 'ok':
             json_data = req.json()
             
+            # Saf TradingView verisini Pandas DataFrame formatına dönüştürme
             df_rt = pd.DataFrame({
                 'Open': json_data['o'],
                 'High': json_data['h'],
@@ -62,10 +68,11 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
                 'Volume': json_data.get('v', [0] * len(json_data['t']))
             }, index=pd.to_datetime(json_data['t'], unit='s'))
             
-            for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+            # Tüm sayısal alanları float tipine zorla (Gecikmeli Yahoo süzgeçlerini kırar)
+            for col in ['Open', 'High', 'Low', 'Close']:
                 df_rt[col] = pd.to_numeric(df_rt[col], errors='coerce')
             
-            # 🌍 Türkiye Saat Senkronizasyonu (+3 Saat)
+            # 🌍 Türkiye Saati Senkronizasyonu (+3 Saat)
             df_rt.index = df_rt.index + timedelta(hours=3)
             df_rt.dropna(subset=['Close'], inplace=True)
             return df_rt
