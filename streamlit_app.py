@@ -137,7 +137,7 @@ with st.sidebar:
     
 # 🌐 Gelişmiş Küresel Varlık Listesi (Kripto, Emtia, Forex, Endeksler)
         # Binance global fiyat akışlarına tam entegre edilmiş kod karşılıkları
-        forex_assets = {
+forex_assets = {
             "⚡ BITCOIN (BTC/USDT)": "BTCUSDT",
             "💎 ETHEREUM (ETH/USDT)": "ETHUSDT",
             "🏆 ONS ALTIN (PAXG/USDT)": "PAXGUSDT",
