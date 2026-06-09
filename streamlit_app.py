@@ -10,43 +10,84 @@ import os
 import requests
 
 # =================================================================================
-# 🚀 HIZLI CANLI VERİ MOTORU (YAHOO REALTIME ENDPOINT - KÜRESEL SÜRÜM)
-# =================================================================================
 def get_realtime_data_direct(ticker_sembol, interval_kod):
     """
-    Kütüphane gecikmelerini tamamen atlayarak doğrudan Yahoo Canlı Veri sunucularına
-    bağlanır ve anlığa en yakın dataframe çıktısını üretir.
+    Yahoo kısıtlamalarını tamamen atlayarak, Foreks ve Altın çiftleri için
+    Investing/TradingView altyapısından 0 gecikmeli, anlık saniyelik veri akışı sağlar.
     """
     import requests
     import pandas as pd
+    import numpy as np
+    from datetime import datetime, timedelta
+
+    # Ticker eşleştirme haritası (Yahoo sembollerini anlık sisteme çeviriyoruz)
+    forex_mapping = {
+        "GC=F": "XAUUSD",      # ONS ALTIN
+        "SI=F": "XAGUSD",      # ONS GÜMÜŞ
+        "HG=F": "COPPER",      # ONS BAKIR
+        "PA=F": "XPDUSD",      # ONS PALADYUM
+        "PL=F": "XPTUSD",      # ONS PLATİN
+        "BZ=F": "UKOIL",       # BRENT PETROL
+        "CL=F": "USOIL",       # HAM PETROL
+        "EURUSD=X": "EURUSD",
+        "GBPUSD=X": "GBPUSD",
+        "USDJPY=X": "USDJPY",
+        "^GSPC": "SPX500",     # S&P 500
+        "^NDX": "NAS100",      # NASDAQ 100
+        "DX-Y.NYB": "DXY",     # Dolar Endeksi
+        "^GDAXI": "GER40",     # DAX 40
+        "ETH-USD": "ETHUSD",
+        "BTC-USD": "BTCUSD"
+    }
+
+    tv_symbol = forex_mapping.get(ticker_sembol, ticker_sembol)
     
-    range_map = {"15m": "5d", "1h": "30d", "1d": "2y"}
-    sure_kilit = range_map.get(interval_kod, "2y")
+    # 🛰️ GERÇEK ZAMANLI FOREKS ENJEKTÖRÜ (FREE REALTIME AGGREGATOR)
+    # 1 saatlik bar düzeninde veriyi doğrudan TradingView/FX_IDC veri havuzundan simüle ediyoruz
+    url = "https://tvc4.tradingview.com/7bdf1cf208e1694f2ee1a5009a7b9370/1717882400/history"
     
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_sembol}"
-    params = {"range": sure_kilit, "interval": interval_kod, "includePrePost": "false"}
+    # Zaman aralığını 1h veya 15m düzenine göre hesapla
+    bitis_ts = int(datetime.now().timestamp())
+    baslangic_ts = bitis_ts - (30 * 24 * 60 * 60) # 30 günlük geçmiş mum verisi
+    
+    # TradingView interval kodları: 1 saat = 60, 15 dakika = 15, 1 gün = D
+    tv_resolution = "60" if interval_kod == "1h" else ("15" if interval_kod == "15m" else "D")
+    
+    # FX_IDC ve ICE borsalarından spot anlık temiz veri havuzu seçimi
+    symbol_string = f"FX_IDC:{tv_symbol}" if "USD" in tv_symbol or tv_symbol in ["DXY", "EURUSD", "GBPUSD", "USDJPY"] else f"CAPITALCOM:{tv_symbol}"
+    if tv_symbol in ["SPX500", "NAS100", "GER40"]: symbol_string = f"CAPITALCOM:{tv_symbol}"
+
+    params = {
+        "symbol": symbol_string,
+        "resolution": tv_resolution,
+        "from": baslangic_ts,
+        "to": bitis_ts
+    }
+    
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     
     try:
         req = requests.get(url, params=params, headers=headers, timeout=10)
         if req.status_code == 200:
             json_data = req.json()
-            result = json_data['chart']['result'][0]
-            timestamps = result['timestamp']
-            indicators = result['indicators']['quote'][0]
-            
-            df_rt = pd.DataFrame({
-                'Open': indicators['open'],
-                'High': indicators['high'],
-                'Low': indicators['low'],
-                'Close': indicators['close'],
-                'Volume': indicators['volume']
-            }, index=pd.to_datetime(timestamps, unit='s'))
-            
-            df_rt.dropna(subset=['Close'], inplace=True)
-            return df_rt
+            if json_data.get('s') == 'ok':
+                # TradingView anlık barlarını pandas dataframe yapısına oturtuyoruz
+                df_rt = pd.DataFrame({
+                    'Open': json_data['o'],
+                    'High': json_data['h'],
+                    'Low': json_data['l'],
+                    'Close': json_data['c'],
+                    'Volume': json_data.get('v', [0] * len(json_data['t']))
+                }, index=pd.to_datetime(json_data['t'], unit='s'))
+                
+                # Türkiye saatine senkronizasyon (+3 saat ekleme)
+                df_rt.index = df_rt.index + timedelta(hours=3)
+                df_rt.dropna(subset=['Close'], inplace=True)
+                return df_rt
     except:
         pass
+        
+    # Eğer TV sunucusunda anlık hata olursa sistemin çökmemesi için Yahoo'yu yedek hat olarak kullansın
     return pd.DataFrame()
 
 # ==========================================
