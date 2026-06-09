@@ -92,45 +92,6 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
         
     return pd.DataFrame()
 # =================================================================================
-# 🚀 HIZLI CANLI VERİ MOTORU (YAHOO REALTIME ENDPOINT - KÜRESEL SÜRÜM)
-# =================================================================================
-def get_realtime_data_direct(ticker_sembol, interval_kod):
-    """
-    Kütüphane gecikmelerini tamamen atlayarak doğrudan Yahoo Canlı Veri sunucularına
-    bağlanır ve anlığa en yakın dataframe çıktısını üretir.
-    """
-    import requests
-    import pandas as pd
-    
-    range_map = {"15m": "5d", "1h": "30d", "1d": "2y"}
-    sure_kilit = range_map.get(interval_kod, "2y")
-    
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_sembol}"
-    params = {"range": sure_kilit, "interval": interval_kod, "includePrePost": "false"}
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
-    
-    try:
-        req = requests.get(url, params=params, headers=headers, timeout=10)
-        if req.status_code == 200:
-            json_data = req.json()
-            result = json_data['chart']['result'][0]
-            timestamps = result['timestamp']
-            indicators = result['indicators']['quote'][0]
-            
-            df_rt = pd.DataFrame({
-                'Open': indicators['open'],
-                'High': indicators['high'],
-                'Low': indicators['low'],
-                'Close': indicators['close'],
-                'Volume': indicators['volume']
-            }, index=pd.to_datetime(timestamps, unit='s'))
-            
-            df_rt.dropna(subset=['Close'], inplace=True)
-            return df_rt
-    except:
-        pass
-    return pd.DataFrame()
-
 # ==========================================
 # 1. SAYFA AYARLARI VE ARAYÜZ TASARIMI
 # ==========================================
