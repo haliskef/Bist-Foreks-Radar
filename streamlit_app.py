@@ -902,12 +902,12 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             if state_sinyal_key not in st.session_state: st.session_state[state_sinyal_key] = "NÖTR (İZLE)" # 
             if state_fiyat_key not in st.session_state: st.session_state[state_fiyat_key] = 0.0 # 
             
-            # 🛰️ YENİ CANLI MOTORU ÇAĞIRIYORUZ (SAYISAL UYUM SAĞLANDI)
+            # 🛰️ YENİ CANLI MOTORU ÇAĞIRIYORUZ
             df_fx = get_realtime_data_direct(asset_ticker, "1h") 
                 
             if not df_fx.empty and len(df_fx) > 25: # 
                 
-                # 🛡️ SÜTUN TİPLERİ SAYISAL HALE GETİRİLİYOR (ESKİ YAHOO TEMİZLEME BLOKLARI KALKTI)
+                # 🛡️ Gecikmeli çoklu indeks süzgeçleri kaldırıldı, doğrudan tipler float yapıldı
                 for col in ['Open', 'High', 'Low', 'Close']:
                     df_fx[col] = pd.to_numeric(df_fx[col], errors='coerce')
                 
@@ -1024,7 +1024,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 if is_msb_bullish: long_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Boğa yönlü kırıldı (MSB/CHoCH)") # 
                     
                 if is_bearish_pin: short_skor += 1.0; nedenler.append("❄️ PRICE ACTION: Ayı Pin Bar oluştu") # 
-                if is_bearish_engulfing: short_skor += 1.0; nedenler.append("❄️ PRICE ACTION: Bearish Engulfing görüldü") # 
+                if is_bearish_engulfing: short_skor += 1.0; nedenler.append("🔥 PRICE ACTION: Bearish Engulfing görüldü") # 
                 if is_msb_bearish: short_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Ayı yönlü kırıldı (MSB/CHoCH)") # 
 
                 long_skor = min(10.0, round(long_skor, 1)) # 
@@ -1069,7 +1069,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                     st.session_state[state_sinyal_key] = "NÖTR (İZLE)" # 
                     st.session_state[state_fiyat_key] = 0.0 # 
 
-                # 🖥️ EKRANDA DETAYLI GÖRSEL GÖSTERİM (SEÇİLİ ENSTRÜMAN)
+                # 🖥️ SEÇİLİ ENSTRÜMAN DETAY GÖSTERİMİ
                 if asset_adi == secilen_forex_adi: # 
                     strateji_yonu = st.session_state[state_sinyal_key] # 
                     
@@ -1086,7 +1086,6 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                         durum_msg = "🟡 TEST BÖLGESİ - BELİRLİ BİR SEVİYE KIRILIMI BEKLENİYOR" # 
                         sl_noktasi = son_fiyat - (atr_val * 2.0); tp_noktasi = son_fiyat + (atr_val * 2.0) #
 
-                    # Savaş Kartı Gösterimi
                     st.markdown(f"""
                         <div style="background-color: {durum_color}; padding: 25px; border-radius: 15px; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
                             <h1 style="color: #FFFFFF !important; border: none; margin: 0; font-size: 2.2rem;">{asset_adi} // DETAYLI CANLI MONITOR</h1>
