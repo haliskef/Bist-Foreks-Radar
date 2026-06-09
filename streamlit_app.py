@@ -8,74 +8,47 @@ import numpy as np
 import time
 import os
 import requests
+
+# =================================================================================
+# 🚀 HIZLI CANLI VERİ MOTORU (YAHOO REALTIME ENDPOINT - KÜRESEL SÜRÜM)
 # =================================================================================
 def get_realtime_data_direct(ticker_sembol, interval_kod):
     """
-    Sadece küresel emtialara odaklanmış, verileri doğrudan BİNANCE VADELİ İŞLEMLER (Futures) 
-    resmi API hattından çeken 7/24 kesintisiz ve bulut uyumlu veri motoru.
+    Kütüphane gecikmelerini tamamen atlayarak doğrudan Yahoo Canlı Veri sunucularına
+    bağlanır ve anlığa en yakın dataframe çıktısını üretir.
     """
     import requests
     import pandas as pd
-    from datetime import datetime, timedelta
-
-    sembol_temiz = str(ticker_sembol).strip()
     
-    # BIST Emniyet Kalkanı
-    if ".IS" in sembol_temiz:
-        return pd.DataFrame()
-
-    # Zaman çözünürlüğünü Binance diline çeviriyoruz (1h -> 1h, 15m -> 15m)
-    binance_interval = "1h" if interval_kod == "1h" else ("15m" if interval_kod == "15m" else "1d")
+    range_map = {"15m": "5d", "1h": "30d", "1d": "2y"}
+    sure_kilit = range_map.get(interval_kod, "2y")
     
-    # 🔄 BİNANCE EMRAH/EMTİA SEMBOL HARİTASI
-    # Senin eski kodlarının kırılmaması için arka planda tam eşleme yapar
-    binance_mapping = {
-        "GC=F": "XAUUSD",       # ONS ALTIN (Binance Vadeli)
-        "SI=F": "XAGUSD",       # ONS GÜMÜŞ (Binance Vadeli)
-        "HG=F": "HGUSDT",       # ONS BAKIR (Binance Vadeli)
-        "BZ=F": "USOILUSDT",    # BRENT PETROL (Binance Vadeli)
-        "XAUUSD": "XAUUSD",
-        "XAGUSD": "XAGUSD"
-    }
-    
-    binance_symbol = binance_mapping.get(sembol_temiz, sembol_temiz)
-    
-    # Binance Resmi Vadeli İşlemler (Futures) Klines Canlı Veri API Noktası
-    url = f"https://fapi.binance.com/fapi/v1/klines?symbol={binance_symbol}&interval={binance_interval}&limit=300"
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_sembol}"
+    params = {"range": sure_kilit, "interval": interval_kod, "includePrePost": "false"}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            raw_data = response.json()
+        req = requests.get(url, params=params, headers=headers, timeout=10)
+        if req.status_code == 200:
+            json_data = req.json()
+            result = json_data['chart']['result'][0]
+            timestamps = result['timestamp']
+            indicators = result['indicators']['quote'][0]
             
-            # Gelen ham JSON paketini senin indikatörlerin muhtaç olduğu kalıba döküyoruz
-            df_rt = pd.DataFrame(raw_data, columns=[
-                'Open_time', 'Open', 'High', 'Low', 'Close', 'Volume',
-                'Close_time', 'Quote_asset_volume', 'Number_of_trades',
-                'Taker_buy_base_val', 'Taker_buy_quote_val', 'Ignore'
-            ])
+            df_rt = pd.DataFrame({
+                'Open': indicators['open'],
+                'High': indicators['high'],
+                'Low': indicators['low'],
+                'Close': indicators['close'],
+                'Volume': indicators['volume']
+            }, index=pd.to_datetime(timestamps, unit='s'))
             
-            # Zaman damgasını (Timestamp) saniyeye çevirip Pandas Datetime Index yapıyoruz
-            df_rt['time'] = pd.to_datetime(df_rt['Open_time'], unit='ms')
-            df_rt.set_index('time', inplace=True)
-            
-            # Sütun tiplerini sayısal (float) yapıyoruz ki formüllerin (RSI, EMA, Box) çökmesin!
-            for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
-                df_rt[col] = pd.to_numeric(df_rt[col], errors='coerce')
-                
-            # Orijinal grafik modunun sadece ihtiyaç duyduğu sütun matrisini bırakıyoruz
-            df_rt = df_rt[['Open', 'High', 'Low', 'Close', 'Volume']]
-            
-            # 🌍 Türkiye Saati Senkronizasyonu (+3 Saat)
-            df_rt.index = df_rt.index + timedelta(hours=3)
             df_rt.dropna(subset=['Close'], inplace=True)
             return df_rt
     except:
         pass
-        
     return pd.DataFrame()
-# =================================================================================
+
 # ==========================================
 # 1. SAYFA AYARLARI VE ARAYÜZ TASARIMI
 # ==========================================
@@ -132,15 +105,24 @@ with st.sidebar:
     ])
     st.markdown("---")
     
-# 🌐 Gelişmiş Küresel Varlık Listesi (Kripto, Emtia, Forex, Endeksler)
-        # Binance global fiyat akışlarına tam entegre edilmiş kod karşılıkları
-# 🌐 Gelişmiş Küresel Varlık Listesi (Genişletilmiş ve Tam Senkronize Mod)
-
+# 🔥 BOZUK OLAN LİSTE SOLA SIFIRLANDI VE SÖZDİZİMİ DÜZELTİLDİ
 forex_assets = {
-    "🏆 ONS ALTIN": "GC=F",
-    "🥈 ONS GÜMÜŞ": "SI=F",
-    "🥉 ONS BAKIR": "HG=F",
-    "🛢️ BRENT PETROL": "BZ=F"
+    "ONS ALTIN": "GC=F",
+    "ONS GÜMÜŞ": "SI=F",
+    "ONS BAKIR" : "HG=F",
+    "ONS PALADYUM": "PA=F",
+    "ONS PLATİN": "PL=F",
+    "BRENT PETROL": "BZ=F",
+    "WTI HAM PETROL": "CL=F",
+    "EUR/USD": "EURUSD=X",
+    "GBP/USD": "GBPUSD=X",
+    "USD/JPY": "USDJPY=X",
+    "S&P 500": "^GSPC",
+    "NASDAQ 100": "^NDX",
+    "DXY (Dolar Endeksi)": "DX-Y.NYB",
+    "DAX 40 (Almanya)": "^GDAXI",
+    "ETH/USD": "ETH-USD",
+    "BTC/USD": "BTC-USD"
 }
 
 # Kodun bundan sonra gelen "if calisma_modu == 'Lazer (Detaylı Analiz & Strateji)':" 
@@ -814,9 +796,12 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 # =================================================================================
 # =================================================================================
 # =================================================================================
+# =================================================================================
+# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (TAM OTONOM ÇOKLU ENSTRÜMAN RADARI - ASIL SABİT DESTEK/DİRENÇLİ)
+# =================================================================================
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
     st_autorefresh(interval=15000, key="global_forex_multi_scan_v15_final_sabit_kaleler") # Canlı yenileme 
-    st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ (TRADINGVIEW CANLI HATTI)") # 
+    st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ (TÜM LİSTE ARKA PLANDA TARANIYOR)") # 
     
     # -----------------------------------------------------------------------------
     # TELEGRAM ENTEGRASYON BÖLÜMÜ
@@ -826,21 +811,21 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
 
     def telegram_sinyal_gonder(mesaj):
         """Kırılım anında Telegram üzerinden anlık bildirim atar.""" # 
-        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID: # 
+        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID: # [cite: 2]
             try:
-                import requests # 
-                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage" # 
-                payload = {"chat_id": TELEGRAM_CHAT_ID, "text": mesaj, "parse_mode": "Markdown"} # 
-                requests.post(url, json=payload, timeout=5) # 
-            except:
-                pass # 
+                import requests # [cite: 2]
+                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage" # [cite: 2]
+                payload = {"chat_id": TELEGRAM_CHAT_ID, "text": mensaje, "parse_mode": "Markdown"} # [cite: 2]
+                requests.post(url, json=payload, timeout=5) # [cite: 2]
+            except Exception as e: # [cite: 3]
+                pass # [cite: 3]
 
     # SEKMELİ YAPI (Grafik Paneli ve Geniş Haber Paneli Ayrımı)
-    fx_tab1, fx_tab2 = st.tabs(["📊 Otonom Teknik Analiz & PA", "📅 Canlı Ekonomik Takvim & Makro Etki"]) # 
+    fx_tab1, fx_tab2 = st.tabs(["📊 Otonom Teknik Analiz & PA", "📅 Canlı Ekonomik Takvim & Makro Etki"]) # [cite: 3]
     
     with fx_tab2:
-        st.markdown("### 📰 Küresel Makroekonomik Takvim (Maksimum Genişlik & Türkçe)") # 
-        st.warning("⚠️ **Volatilite Uyarısı:** Yüksek etkili (3 Yıldızlı / Kırmızı) verilerin açıklanma saatlerinde teknik indikatörler devredışı kalabilir. Haber saatinden 15 dk önce ve sonra işlem riskini minimuma indirin.") # 
+        st.markdown("### 📰 Küresel Makroekonomik Takvim (Maksimum Genişlik & Türkçe)") # [cite: 3]
+        st.warning("⚠️ **Volatilite Uyarısı:** Yüksek etkili (3 Yıldızlı / Kırmızı) verilerin açıklanma saatlerinde teknik indikatörler devredışı kalabilir. Haber saatinden 15 dk önce ve sonra işlem riskini minimuma indirin.") # [cite: 3, 4]
         
         ekonomik_takvim_html = """
         <div style="position: relative; width: 100%; margin: 0; padding: 0;">
@@ -860,299 +845,307 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
               "importanceFilter": "-1,0,1",
               "countryFilter": "us,eu,gb,jp,ch,ca,au,tr"
               }
-              </script>
+            </script>
             </div>
         </div>
-        """ # 
-        st.components.v1.html(ekonomik_takvim_html, height=950, scrolling=True) # 
+        """ # [cite: 4, 5, 6, 7, 8]
+        st.components.v1.html(ekonomik_takvim_html, height=950, scrolling=True) # [cite: 8]
         
     with fx_tab1:
         # Sabit Test Butonu
-        if st.button("🚀 Sistem Bildirim Testini Tetikle"): # 
+        if st.button("🚀 Sistem Bildirim Testini Tetikle"): # [cite: 8]
             try:
-                import requests # 
-                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage" # 
-                payload = {"chat_id": TELEGRAM_CHAT_ID, "text": "🎯 *SİSTEM TESTİ BAŞARILI!*\n\nTradingView Canlı Veri motorlu çoklu tarama modunda Telegram hattınız aktiftir.", "parse_mode": "Markdown"} # 
-                response = requests.post(url, json=payload, timeout=5) # 
+                import requests # [cite: 9]
+                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage" # [cite: 9]
+                payload = {"chat_id": TELEGRAM_CHAT_ID, "text": "🎯 *SİSTEM TESTİ BAŞARILI!*\n\nAsıl Sabit Kaleli çoklu tarama modunda Telegram hattınız aktiftir.", "parse_mode": "Markdown"} # [cite: 9]
+                response = requests.post(url, json=payload, timeout=5) # [cite: 9]
                 if response.status_code == 200: 
-                    st.success("🎯 Harika! Mesaj başarıyla gönderildi. Telefonunu kontrol et.") # 
+                    st.success("🎯 Harika! Mesaj başarıyla gönderildi. Telefonunu kontrol et.") # [cite: 10, 11]
                 else: 
-                    st.error(f"❌ Telegram API Hata Döndürdü: {response.text}") # 
+                    st.error(f"❌ Telegram API Hata Döndürdü: {response.text}") # [cite: 11]
             except Exception as e: 
-                st.error(f"🚨 Sunucu/Ağ Bağlantı Hatası: {e}") # 
+                st.error(f"🚨 Sunucu/Ağ Bağlantı Hatası: {e}") # [cite: 11]
 
-        st.info("🔄 **7/24 Arka Plan Tarayıcısı Aktif:** Grafik üzerinde kalın düz çizgiler ASIL SABİT kaleleri, kesikli ince çizgiler ise yürüyen anlık momentum seviyelerini gösterir.") # 
+        st.info("🔄 **7/24 Arka Plan Tarayıcısı Aktif:** Grafik üzerinde kalın düz çizgiler ASIL SABİT kaleleri, kesikli ince çizgiler ise yürüyen anlık momentum seviyelerini gösterir.") # [cite: 11]
         
-        secilen_forex_adi = st.selectbox("Ekranda Detaylı İncelemek İstediğiniz Küresel Enstrüman:", list(forex_assets.keys())) # 
-        sonuclar = [] # 
+        # Ekranda detaylarını, nedenlerini ve grafiğini görmek istediğin enstrüman seçimi
+        secilen_forex_adi = st.selectbox("Ekranda Detaylı İncelemek İstediğiniz Küresel Enstrüman:", list(forex_assets.keys())) # [cite: 12]
+        
+        # Sıralama hatasını engellemek için listeyi en başta boş küme olarak sağlama alıyoruz
+        sonuclar = [] # [cite: 12]
 
         # 🤖 OTONOM ÇOKLU TARAMA DÖNGÜSÜ
-        for asset_adi, asset_ticker in forex_assets.items(): # 
+        for asset_adi, asset_ticker in forex_assets.items(): # [cite: 12]
             
-            state_sinyal_key = f"fx_state_yon_{asset_adi}" # 
-            state_fiyat_key = f"fx_lock_price_{asset_adi}" # 
+            # Her enstrüman için bağımsız hafıza alanı kilitliyoruz
+            state_sinyal_key = f"fx_state_yon_{asset_adi}" # [cite: 13]
+            state_fiyat_key = f"fx_lock_price_{asset_adi}" # [cite: 13]
             
-            if state_sinyal_key not in st.session_state: st.session_state[state_sinyal_key] = "NÖTR (İZLE)" # 
-            if state_fiyat_key not in st.session_state: st.session_state[state_fiyat_key] = 0.0 # 
+            if state_sinyal_key not in st.session_state: st.session_state[state_sinyal_key] = "NÖTR (İZLE)" # [cite: 13]
+            if state_fiyat_key not in st.session_state: st.session_state[state_fiyat_key] = 0.0 # [cite: 13]
             
-            # 🛰️ YENİ CANLI MOTORU ÇAĞIRIYORUZ
-            df_fx = get_realtime_data_direct(asset_ticker, "1h") 
+            # 🛰️ GECİKMESİZ FOREKS ANLIK VERİ ENJEKTÖRÜ AKTİF (1 SAATLİK VARYASYON)
+            df_fx = get_realtime_data_direct(asset_ticker, "1h")
                 
-            if not df_fx.empty and len(df_fx) > 25: # 
+            if not df_fx.empty and len(df_fx) > 25: # [cite: 14]
+                # --- ÇOK KATMANLI VERİ YAPISINI KESİN DÜZLEŞTİRME KORUMASI (Olası Multi-Index zırhı) ---
+                if isinstance(df_fx.columns, pd.MultiIndex): # 
+                    df_fx.columns = df_fx.columns.get_level_values(0) # 
+                df_fx.columns = [str(c).strip().capitalize() for c in df_fx.columns] # 
                 
-                # 🛡️ Gecikmeli çoklu indeks süzgeçleri kaldırıldı, doğrudan tipler float yapıldı
-                for col in ['Open', 'High', 'Low', 'Close']:
-                    df_fx[col] = pd.to_numeric(df_fx[col], errors='coerce')
+                # Sütunların DataFrame mi yoksa Series mi olduğunu hatasız çözen zırh katmanı
+                if hasattr(df_fx['Open'], 'columns') or (type(df_fx['Open']).__name__ == 'DataFrame'): df_fx['Open'] = df_fx['Open'].iloc[:, 0] # [cite: 16]
+                if hasattr(df_fx['High'], 'columns') or (type(df_fx['High']).__name__ == 'DataFrame'): df_fx['High'] = df_fx['High'].iloc[:, 0] # [cite: 16]
+                if hasattr(df_fx['Low'], 'columns') or (type(df_fx['Low']).__name__ == 'DataFrame'): df_fx['Low'] = df_fx['Low'].iloc[:, 0] # [cite: 16, 17]
+                if hasattr(df_fx['Close'], 'columns') or (type(df_fx['Close']).__name__ == 'DataFrame'): df_fx['Close'] = df_fx['Close'].iloc[:, 0] # [cite: 17]
                 
                 # 🏃 1. DİNAMİK/YÜRÜYEN SEVİYELER (Momentum Takibi - Son 15 Mum)
-                df_fx['Direnç_S1'] = df_fx['High'].rolling(window=15).max().shift(1) # 
-                df_fx['Destek_D1'] = df_fx['Low'].rolling(window=15).min().shift(1) # 
+                df_fx['Direnç_S1'] = df_fx['High'].rolling(window=15).max().shift(1) # [cite: 17]
+                df_fx['Destek_D1'] = df_fx['Low'].rolling(window=15).min().shift(1) # [cite: 18]
                 
                 # 🏛️ 2. ASIL SABİT PSİKOLOJİK KALELER (Geniş Zamanlı Klasik Pivot Kümesi)
-                gecmis_high = df_fx['High'].tail(24).max() # 
-                gecmis_low = df_fx['Low'].tail(24).min() # 
-                gecmis_close = df_fx['Close'].tail(24).mean() # 
+                gecmis_high = df_fx['High'].tail(24).max() # [cite: 18]
+                gecmis_low = df_fx['Low'].tail(24).min() # [cite: 18]
+                gecmis_close = df_fx['Close'].tail(24).mean() # Gürültüyü engellemek için ortalama denge noktası [cite: 19]
                 
-                sabit_pivot = (gecmis_high + gecmis_low + gecmis_close) / 3 # 
-                asıl_direnc_kale = (2 * sabit_pivot) - gecmis_low # 
-                asıl_destek_kale = (2 * sabit_pivot) - gecmis_high # 
-        
+                sabit_pivot = (gecmis_high + gecmis_low + gecmis_close) / 3 # [cite: 19]
+                asıl_direnc_kale = (2 * sabit_pivot) - gecmis_low # [cite: 19]
+                asıl_destek_kale = (2 * sabit_pivot) - gecmis_high # [cite: 19]
+                
                 # 3. Kristal Box Hesaplamaları (Donchian)
-                df_fx['box_ust'] = df_fx['High'].rolling(window=20).max() # 
-                df_fx['box_alt'] = df_fx['Low'].rolling(window=20).min() # 
-                df_fx['box_orta'] = (df_fx['box_ust'] + df_fx['box_alt']) / 2 # 
-    
+                df_fx['box_ust'] = df_fx['High'].rolling(window=20).max() # [cite: 20]
+                df_fx['box_alt'] = df_fx['Low'].rolling(window=20).min() # [cite: 20]
+                df_fx['box_orta'] = (df_fx['box_ust'] + df_fx['box_alt']) / 2 # [cite: 20]
+                
                 # 4. Native ATR & Teknik İndikatör Hesaplamaları
-                high_low = df_fx['High'] - df_fx['Low'] # 
-                high_close = (df_fx['High'] - df_fx['Close'].shift()).abs() # 
-                low_close = (df_fx['Low'] - df_fx['Close'].shift()).abs() # 
-                ranges = pd.concat([high_low, high_close, low_close], axis=1) # 
-                true_range = ranges.max(axis=1) # 
-                df_fx['ATR'] = true_range.ewm(alpha=1/14, adjust=False).mean() # 
+                high_low = df_fx['High'] - df_fx['Low'] # [cite: 21]
+                high_close = (df_fx['High'] - df_fx['Close'].shift()).abs() # [cite: 21]
+                low_close = (df_fx['Low'] - df_fx['Close'].shift()).abs() # [cite: 21]
+                ranges = pd.concat([high_low, high_close, low_close], axis=1) # [cite: 22]
+                true_range = ranges.max(axis=1) # [cite: 22]
+                df_fx['ATR'] = true_range.ewm(alpha=1/14, adjust=False).mean() # [cite: 22]
                 
-                fx_delta = df_fx['Close'].diff() # 
-                fx_gain = fx_delta.clip(lower=0) # 
-                fx_loss = -fx_delta.clip(upper=0) # 
-                fx_avg_gain = fx_gain.ewm(com=13, adjust=False).mean() # 
-                fx_avg_loss = fx_loss.ewm(com=13, adjust=False).mean() # 
-                fx_rs = fx_avg_gain / fx_avg_loss # 
-                df_fx['RSI'] = 100 - (100 / (1 + fx_rs)) # 
+                fx_delta = df_fx['Close'].diff() # [cite: 22]
+                fx_gain = fx_delta.clip(lower=0) # [cite: 23]
+                fx_loss = -fx_delta.clip(upper=0) # [cite: 23]
+                fx_avg_gain = fx_gain.ewm(com=13, adjust=False).mean() # [cite: 23]
+                fx_avg_loss = fx_loss.ewm(com=13, adjust=False).mean() # [cite: 23]
+                fx_rs = fx_avg_gain / fx_avg_loss # [cite: 23]
+                df_fx['RSI'] = 100 - (100 / (1 + fx_rs)) # [cite: 23, 24]
                 
-                df_fx['EMA21'] = df_fx['Close'].ewm(span=21, adjust=False).mean() # 
-                df_fx['EMA50'] = df_fx['Close'].ewm(span=50, adjust=False).mean() # 
+                df_fx['EMA21'] = df_fx['Close'].ewm(span=21, adjust=False).mean() # [cite: 24]
+                df_fx['EMA50'] = df_fx['Close'].ewm(span=50, adjust=False).mean() # [cite: 24]
                 
-                son_fiyat = float(df_fx['Close'].iloc[-1]) # 
-                atr_val = float(df_fx['ATR'].iloc[-1]) # 
-                rsi_val = float(df_fx['RSI'].iloc[-1]) # 
+                son_fiyat = float(df_fx['Close'].iloc[-1]) # [cite: 24]
+                atr_val = float(df_fx['ATR'].iloc[-1]) # [cite: 25]
+                rsi_val = float(df_fx['RSI'].iloc[-1]) # [cite: 25]
+                b_ust = float(df_fx['box_ust'].iloc[-2]) # [cite: 25]
+                b_alt = float(df_fx['box_alt'].iloc[-2]) # [cite: 25]
+                ema21 = float(df_fx['EMA21'].iloc[-1]) # [cite: 25]
+                ema50 = float(df_fx['EMA50'].iloc[-1]) # [cite: 25]
                 
-                b_ust = float(df_fx['box_ust'].iloc[-2]) # 
-                b_alt = float(df_fx['box_alt'].iloc[-2]) # 
-                ema21 = float(df_fx['EMA21'].iloc[-1]) # 
-                ema50 = float(df_fx['EMA50'].iloc[-1]) # 
-                
-                yuruyen_direnc = float(df_fx['Direnç_S1'].iloc[-1]) # 
-                yuruyen_destek = float(df_fx['Destek_D1'].iloc[-1]) # 
+                yuruyen_direnc = float(df_fx['Direnç_S1'].iloc[-1]) # [cite: 26]
+                yuruyen_destek = float(df_fx['Destek_D1'].iloc[-1]) # [cite: 26]
                 
                 # 5. PRICE ACTION SINIFLANDIRICI KATMANI
-                son_mum_high = float(df_fx['High'].iloc[-1]) # 
-                son_mum_low = float(df_fx['Low'].iloc[-1]) # 
-                son_mum_open = float(df_fx['Open'].iloc[-1]) # 
-                son_mum_close = float(df_fx['Close'].iloc[-1]) # 
+                son_mum_high = float(df_fx['High'].iloc[-1]) # [cite: 27]
+                son_mum_low = float(df_fx['Low'].iloc[-1]) # [cite: 27]
+                son_mum_open = float(df_fx['Open'].iloc[-1]) # [cite: 27]
+                son_mum_close = float(df_fx['Close'].iloc[-1]) # [cite: 27]
                 
-                onceki_mum_high = float(df_fx['High'].iloc[-2]) # 
-                onceki_mum_low = float(df_fx['Low'].iloc[-2]) # 
-                onceki_mum_open = float(df_fx['Open'].iloc[-2]) # 
-                onceki_mum_close = float(df_fx['Close'].iloc[-2]) # 
+                onceki_mum_high = float(df_fx['High'].iloc[-2]) # [cite: 27]
+                onceki_mum_low = float(df_fx['Low'].iloc[-2]) # [cite: 28]
+                onceki_mum_open = float(df_fx['Open'].iloc[-2]) # [cite: 28]
+                onceki_mum_close = float(df_fx['Close'].iloc[-2]) # [cite: 28]
                 
-                mum_boyu = son_mum_high - son_mum_low # 
-                alt_fitil = min(son_mum_open, son_mum_close) - son_mum_low # 
-                ust_fitil = son_mum_high - max(son_mum_open, son_mum_close) # 
+                mum_boyu = son_mum_high - son_mum_low # [cite: 28]
+                alt_fitil = min(son_mum_open, son_mum_close) - son_mum_low # [cite: 28, 29]
+                ust_fitil = son_mum_high - max(son_mum_open, son_mum_close) # [cite: 29]
                 
-                is_bullish_pin = (alt_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False # 
-                is_bearish_pin = (ust_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False # 
-                is_bullish_engulfing = (onceki_mum_close < onceki_mum_open) and (son_mum_close > son_mum_open) and (son_mum_close > onceki_mum_open) # 
-                is_bearish_engulfing = (onceki_mum_close > onceki_mum_open) and (son_mum_close < son_mum_open) and (son_mum_close < onceki_mum_open) # 
+                is_bullish_pin = (alt_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False # [cite: 29]
+                is_bearish_pin = (ust_fitil / mum_boyu) > 0.60 if mum_boyu > 0 else False # [cite: 29]
+                is_bullish_engulfing = (onceki_mum_close < onceki_mum_open) and (son_mum_close > son_mum_open) and (son_mum_close > onceki_mum_open) # [cite: 30]
+                is_bearish_engulfing = (onceki_mum_close > onceki_mum_open) and (son_mum_close < son_mum_open) and (son_mum_close < onceki_mum_open) # [cite: 30]
                 
-                son_ekstrem_zirve = df_fx['High'].tail(15).iloc[:-1].max() # 
-                son_ekstrem_dip = df_fx['Low'].tail(15).iloc[:-1].min() # 
-                is_msb_bullish = son_fiyat > son_ekstrem_zirve # 
-                is_msb_bearish = son_fiyat < son_ekstrem_dip #
+                son_ekstrem_zirve = df_fx['High'].tail(15).iloc[:-1].max() # [cite: 30]
+                son_ekstrem_dip = df_fx['Low'].tail(15).iloc[:-1].min() # [cite: 31]
+                is_msb_bullish = son_fiyat > son_ekstrem_zirve # [cite: 31]
+                is_msb_bearish = son_fiyat < son_ekstrem_dip # [cite: 31]
 
-                # 6. ÇİFT YÖNLÜ KARAR MOTORU
-                long_skor = 0.0 # 
-                short_skor = 0.0 # 
-                nedenler = [] # 
+                # 6. ÇİFT YÖNLÜ KARAR MOTORU (HIBRIIT DESTEK/DİRENÇ ENTEGRELİ)
+                long_skor = 0.0 # [cite: 31]
+                short_skor = 0.0 # [cite: 32]
+                nedenler = [] # [cite: 32]
                 
                 if son_fiyat > b_ust:
-                    long_skor += 3.5; nedenler.append("🟩 KRİSTAL BOX: Üst band yukarı yönlü kırıldı (Long +3.5)") # 
+                    long_skor += 3.5; nedenler.append("🟩 KRİSTAL BOX: Üst band yukarı yönlü kırıldı (Long +3.5)") # [cite: 32, 33]
                 elif son_fiyat < b_alt:
-                    short_skor += 3.5; nedenler.append("🟥 KRİSTAL BOX: Alt band aşağı yönlü kırıldı (Short +3.5)") # 
+                    short_skor += 3.5; nedenler.append("🟥 KRİSTAL BOX: Alt band aşağı yönlü kırıldı (Short +3.5)") # [cite: 33, 34]
                 else:
-                    long_skor += 0.5; short_skor += 0.5; nedenler.append("🟨 KRİSTAL BOX: Fiyat kutu içinde konsolide oluyor (Nötr +0.5)") # 
+                    long_skor += 0.5; short_skor += 0.5; nedenler.append("🟨 KRİSTAL BOX: Fiyat kutu içinde konsolide oluyor (Nötr +0.5)") # [cite: 34, 35]
                 
+                # Yürüyen Seviye Tetik Kontrolleri (+1.0)
                 if son_fiyat > yuruyen_direnc:
-                    long_skor += 1.0; nedenler.append(f"🎯 MOMENTUM: {yuruyen_direnc:.4f} Anlık Direnci yukarı aşıldı (Long +1.0)") # 
+                    long_skor += 1.0; nedenler.append(f"🎯 MOMENTUM: {yuruyen_direnc:.4f} Anlık Direnci yukarı aşıldı (Long +1.0)") # [cite: 35, 36]
                 elif son_fiyat < yuruyen_destek:
-                    short_skor += 1.0; nedenler.append(f"🎯 MOMENTUM: {yuruyen_destek:.4f} Anlık Desteği aşağı yönlü patladı (Short +1.0)") # 
+                    short_skor += 1.0; nedenler.append(f"🎯 MOMENTUM: {yuruyen_destek:.4f} Anlık Desteği aşağı yönlü patladı (Short +1.0)") # [cite: 36, 37]
                 
+                # 🏛️ ASIL SABİT KALE KONTROLÜ (Ekstra Güven Onayı +1.0)
                 if son_fiyat > asıl_direnc_kale:
-                    long_skor += 1.0; nedenler.append(f"🏰 ASIL KALE YIKILDI: {asıl_direnc_kale:.4f} Sabit Ana Direnci yukarı geçildi! (Long +1.0)") # 
+                    long_skor += 1.0; nedenler.append(f"🏰 ASIL KALE YIKILDI: {asıl_direnc_kale:.4f} Sabit Ana Direnci yukarı geçildi! (Long +1.0)") # [cite: 37, 38]
                 elif son_fiyat < asıl_destek_kale:
-                    short_skor += 1.0; nedenler.append(f"🏰 ASIL KALE YIKILDI: {asıl_destek_kale:.4f} Sabit Ana Desteği aşağı yönlü kırıldı! (Short +1.0)") # 
+                    short_skor += 1.0; nedenler.append(f"🏰 ASIL KALE YIKILDI: {asıl_destek_kale:.4f} Sabit Ana Desteği aşağı yönlü kırıldı! (Short +1.0)") # [cite: 38, 39]
                     
                 if son_fiyat > ema21 and ema21 > ema50:
-                    long_skor += 2.0; nedenler.append("🟩 GANN/TREND: EMA'lar boğa diziliminde ve fiyat üstünde (Long +2.0)") # 
+                    long_skor += 2.0; nedenler.append("🟩 GANN/TREND: EMA'lar boğa diziliminde ve fiyat üstünde (Long +2.0)") # [cite: 39, 40]
                 elif son_fiyat < ema21 and ema21 < ema50:
-                    short_skor += 2.0; nedenler.append("🟥 GANN/TREND: EMA'lar ayı diziliminde ve fiyat altında (Short +2.0)") # 
+                    short_skor += 2.0; nedenler.append("🟥 GANN/TREND: EMA'lar ayı diziliminde ve fiyat altında (Short +2.0)") # [cite: 40, 41]
                 else:
-                    nedenler.append("🟨 GANN/TREND: Hareketli ortalamalar kararsız bölgede") # 
+                    nedenler.append("🟨 GANN/TREND: Hareketli ortalamalar kararsız bölgede") # [cite: 41]
                     
-                if 50 < rsi_val < 70: long_skor += 1.5 # 
-                elif 30 < rsi_val <= 50: short_skor += 1.5 # 
-                elif rsi_val >= 70: short_skor += 1.0 # 
-                elif rsi_val <= 30: long_skor += 1.0 # 
+                if 50 < rsi_val < 70: long_skor += 1.5 # [cite: 41]
+                elif 30 < rsi_val <= 50: short_skor += 1.5 # [cite: 42]
+                elif rsi_val >= 70: short_skor += 1.0 # [cite: 42]
+                elif rsi_val <= 30: long_skor += 1.0 # [cite: 42]
 
-                if is_bullish_pin: long_skor += 1.0; nedenler.append("🔥 PRICE ACTION: Boğa Pin Bar oluştu") # 
-                if is_bullish_engulfing: long_skor += 1.0; nedenler.append("🔥 PRICE ACTION: Bullish Engulfing görüldü") # 
-                if is_msb_bullish: long_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Boğa yönlü kırıldı (MSB/CHoCH)") # 
+                if is_bullish_pin: long_skor += 1.0; nedenler.append("🔥 PRICE ACTION: Boğa Pin Bar oluştu") # [cite: 42, 43]
+                if is_bullish_engulfing: long_skor += 1.0; nedenler.append("🔥 PRICE ACTION: Bullish Engulfing görüldü") # [cite: 43, 44]
+                if is_msb_bullish: long_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Boğa yönlü kırıldı (MSB/CHoCH)") # [cite: 44, 45]
                     
-                if is_bearish_pin: short_skor += 1.0; nedenler.append("❄️ PRICE ACTION: Ayı Pin Bar oluştu") # 
-                if is_bearish_engulfing: short_skor += 1.0; nedenler.append("🔥 PRICE ACTION: Bearish Engulfing görüldü") # 
-                if is_msb_bearish: short_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Ayı yönlü kırıldı (MSB/CHoCH)") # 
+                if is_bearish_pin: short_skor += 1.0; nedenler.append("❄️ PRICE ACTION: Ayı Pin Bar oluştu") # [cite: 45, 46]
+                if is_bearish_engulfing: short_skor += 1.0; nedenler.append("❄️ PRICE ACTION: Bearish Engulfing görüldü") # [cite: 46, 47]
+                if is_msb_bearish: short_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Ayı yönlü kırıldı (MSB/CHoCH)") # [cite: 47, 48]
 
-                long_skor = min(10.0, round(long_skor, 1)) # 
-                short_skor = min(10.0, round(short_skor, 1)) #
+                long_skor = min(10.0, round(long_skor, 1)) # [cite: 48]
+                short_skor = min(10.0, round(short_skor, 1)) # [cite: 48]
 
-                anlik_algoritma_yonu = "NÖTR (İZLE)" # 
-                if long_skor >= 7.0 and long_skor >= short_skor: anlik_algoritma_yonu = "LONG (YUKARI)" # 
-                elif short_skor >= 7.0 and short_skor > long_skor: anlik_algoritma_yonu = "SHORT (AŞAĞI)" #
+                anlik_algoritma_yonu = "NÖTR (İZLE)" # [cite: 48]
+                if long_skor >= 7.0 and long_skor >= short_skor: anlik_algoritma_yonu = "LONG (YUKARI)" # [cite: 48]
+                elif short_skor >= 7.0 and short_skor > long_skor: anlik_algoritma_yonu = "SHORT (AŞAĞI)" # [cite: 49]
 
-                hibrit_hesap = max(long_skor, short_skor) # 
-               
+                # Listeye ana sayfada sıralanabilmesi için sonuçları ekliyoruz
+                hibrit_hesap = max(long_skor, short_skor) # [cite: 49]
                 sonuclar.append({
-                    "Enstrüman": asset_adi, "Anlık Fiyat": son_fiyat, "Yön": anlik_algoritma_yonu, # 
-                    "Long Skor": long_skor, "Short Skor": short_skor, "Hibrit Skor": hibrit_hesap, "RSI": rsi_val # 
+                    "Enstrüman": asset_adi, "Anlık Fiyat": son_fiyat, "Yön": anlik_algoritma_yonu, # [cite: 50]
+                    "Long Skor": long_skor, "Short Skor": short_skor, "Hibrit Skor": hibrit_hesap, "RSI": rsi_val # [cite: 50]
                 })
 
-                # ARKA PLAN TELEGRAM BİLDİRİM TETİKLEYİCİ
-                if anlik_algoritma_yonu != "NÖTR (İZLE)" and st.session_state[state_sinyal_key] == "NÖTR (İZLE)": # 
-                    st.session_state[state_sinyal_key] = anlik_algoritma_yonu # 
-                    st.session_state[state_fiyat_key] = son_fiyat # 
-                 
-                    hedef_tp = son_fiyat + (atr_val * 2.0) if anlik_algoritma_yonu == "LONG (YUKARI)" else son_fiyat - (atr_val * 2.0) # 
-                    risk_sl = son_fiyat - (atr_val * 1) if anlik_algoritma_yonu == "LONG (YUKARI)" else son_fiyat + (atr_val * 1) # 
-                
-                    skor_val = long_skor if anlik_algoritma_yonu == "LONG (YUKARI)" else short_skor # 
-                    emoji = "🚀" if anlik_algoritma_yonu == "LONG (YUKARI)" else "💥" # 
+                # AKILLI BELLEK KİLİTLEME & ARKA PLAN TELEGRAM BİLDİRİM TETİKLEYİCİ
+                if anlik_algoritma_yonu != "NÖTR (İZLE)" and st.session_state[state_sinyal_key] == "NÖTR (İZLE)": # [cite: 50, 51]
+                    st.session_state[state_sinyal_key] = anlik_algoritma_yonu # [cite: 51]
+                    st.session_state[state_fiyat_key] = son_fiyat # [cite: 51]
+                    
+                    hedef_tp = son_fiyat + (atr_val * 2.0) if anlik_algoritma_yonu == "LONG (YUKARI)" else son_fiyat - (atr_val * 2.0) # [cite: 51, 52]
+                    risk_sl = son_fiyat - (atr_val * 1) if anlik_algoritma_yonu == "LONG (YUKARI)" else son_fiyat + (atr_val * 1) # [cite: 52]
+                    skor_val = long_skor if anlik_algoritma_yonu == "LONG (YUKARI)" else short_skor # [cite: 52]
+                    emoji = "🚀" if anlik_algoritma_yonu == "LONG (YUKARI)" else "💥" # [cite: 52]
                     
                     mesaj_metni = (
                         f"{emoji} *OTONOM KIRILIM BİLDİRİMİ*\n\n"
                         f"**Enstrüman:** {asset_adi}\n"
-                        f"**Strateji Yönü:** {anlik_algoritma_yonu}\n" # 
-                        f"**Giriş Seviyesi:** `{son_fiyat:.4f}`\n" # 
-                        f"**🏰 ASIL SABİT DİRENÇ:** `{asıl_direnc_kale:.4f}`\n" # 
-                        f"**🏰 ASIL SABİT DESTEK:** `{asıl_destek_kale:.4f}`\n" # 
-                        f"**Hedef (TP):** `{hedef_tp:.4f}`\n" # 
-                        f"**Zarar Kes (SL):** `{risk_sl:.4f}`\n" # 
-                        f"**Sistem Güven Skoru:** `{skor_val}/10`" # 
+                        f"**Strateji Yönü:** {anlik_algoritma_yonu}\n" # [cite: 53, 54]
+                        f"**Giriş Seviyesi:** `{son_fiyat:.4f}`\n" # [cite: 54]
+                        f"**🏰 ASIL SABİT DİRENÇ:** `{asıl_direnc_kale:.4f}`\n" # [cite: 54]
+                        f"**🏰 ASIL SABİT DESTEK:** `{asıl_destek_kale:.4f}`\n" # [cite: 54]
+                        f"**Hedef (TP):** `{hedef_tp:.4f}`\n" # [cite: 55]
+                        f"**Zarar Kes (SL):** `{risk_sl:.4f}`\n" # [cite: 55]
+                        f"**Sistem Güven Skoru:** `{skor_val}/10`" # [cite: 55]
                     )
-                    telegram_sinyal_gonder(mesaj_metni) # 
-                     
-                elif anlik_algoritma_yonu == "NÖTR (İZLE)": # 
-                    st.session_state[state_sinyal_key] = "NÖTR (İZLE)" # 
-                    st.session_state[state_fiyat_key] = 0.0 # 
-
-                # 🖥️ SEÇİLİ ENSTRÜMAN DETAY GÖSTERİMİ
-                if asset_adi == secilen_forex_adi: # 
-                    strateji_yonu = st.session_state[state_sinyal_key] # 
+                    telegram_sinyal_gonder(mesaj_metni) # [cite: 56]
                     
-                    if strateji_yonu == "LONG (YUKARI)": # 
-                        ana_skor = long_skor; durum_color = "#2ECC71"; sinyal_tetik_fiyati = st.session_state[state_fiyat_key] # 
-                        durum_msg = f"🚀 GÜÇLÜ BOĞA - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN SİNYAL SABİTLENDİ" # 
-                        sl_noktasi = sinyal_tetik_fiyati - (atr_val * 1); tp_noktasi = sinyal_tetik_fiyati + (atr_val * 2.0) # 
-                    elif strateji_yonu == "SHORT (AŞAĞI)": # 
-                        ana_skor = short_skor; durum_color = "#E74C3C"; sinyal_tetik_fiyati = st.session_state[state_fiyat_key] # 
-                        durum_msg = f"💥 GÜÇLÜ AYI - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN AÇIĞA SATIŞ SABİTLENDİ" # 
-                        sl_noktasi = sinyal_tetik_fiyati + (atr_val * 1); tp_noktasi = sinyal_tetik_fiyati - (atr_val * 2.0) # 
-                    else:
-                        ana_skor = max(long_skor, short_skor); durum_color = "#F1C40F"; sinyal_tetik_fiyati = son_fiyat # 
-                        durum_msg = "🟡 TEST BÖLGESİ - BELİRLİ BİR SEVİYE KIRILIMI BEKLENİYOR" # 
-                        sl_noktasi = son_fiyat - (atr_val * 2.0); tp_noktasi = son_fiyat + (atr_val * 2.0) #
+                elif anlik_algoritma_yonu == "NÖTR (İZLE)": # [cite: 56]
+                    st.session_state[state_sinyal_key] = "NÖTR (İZLE)" # [cite: 56]
+                    st.session_state[state_fiyat_key] = 0.0 # [cite: 57]
 
+                # 🖥️ EKRANDA O AN SEÇİLİ OLAN ENSTRÜMANIN DETAYLI GÖRSEL GÖSTERİMİ
+                if asset_adi == secilen_forex_adi: # [cite: 57]
+                    strateji_yonu = st.session_state[state_sinyal_key] # [cite: 57]
+                    
+                    if strateji_yonu == "LONG (YUKARI)": # [cite: 58]
+                        ana_skor = long_skor; durum_color = "#2ECC71"; sinyal_tetik_fiyati = st.session_state[state_fiyat_key] # [cite: 58, 59]
+                        durum_msg = f"🚀 GÜÇLÜ BOĞA - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN SİNYAL SABİTLENDİ" # [cite: 59]
+                        sl_noktasi = sinyal_tetik_fiyati - (atr_val * 1); tp_noktasi = sinyal_tetik_fiyati + (atr_val * 2.0) # [cite: 59, 60]
+                    elif strateji_yonu == "SHORT (AŞAĞI)": # [cite: 60]
+                        ana_skor = short_skor; durum_color = "#E74C3C"; sinyal_tetik_fiyati = st.session_state[state_fiyat_key] # [cite: 60, 61]
+                        durum_msg = f"💥 GÜÇLÜ AYI - {sinyal_tetik_fiyati:.4f} SEVİYESİNDEN AÇIĞA SATIŞ SABİTLENDİ" # [cite: 61]
+                        sl_noktasi = sinyal_tetik_fiyati + (atr_val * 1); tp_noktasi = sinyal_tetik_fiyati - (atr_val * 2.0) # [cite: 61, 62]
+                    else:
+                        ana_skor = max(long_skor, short_skor); durum_color = "#F1C40F"; sinyal_tetik_fiyati = son_fiyat # [cite: 62, 63]
+                        durum_msg = "🟡 TEST BÖLGESİ - BELİRLİ BİR SEVİYE KIRILIMI BEKLENİYOR" # [cite: 63]
+                        sl_noktasi = son_fiyat - (atr_val * 2.0); tp_noktasi = son_fiyat + (atr_val * 2.0) # [cite: 63, 64]
+
+                    # Savaş Kartı Gösterimi
                     st.markdown(f"""
                         <div style="background-color: {durum_color}; padding: 25px; border-radius: 15px; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
                             <h1 style="color: #FFFFFF !important; border: none; margin: 0; font-size: 2.2rem;">{asset_adi} // DETAYLI CANLI MONITOR</h1>
                             <h3 style="color: #FFFFFF !important; border: none; margin: 8px 0 0 0; font-weight: 800;">{durum_msg} (Sistem Güven Skoru: {ana_skor:.1f}/10)</h3>
                         </div>
-                    """, unsafe_allow_html=True) # 
+                    """, unsafe_allow_html=True) # [cite: 64, 65, 66]
 
-                    # METRIC SENSÖRLERİ
-                    f1, f2, f3, f4, f5 = st.columns(5) # 
-                    if strateji_yonu != "NÖTR (İZLE)": # 
-                        f1.metric("🎯 SİNYAL GİRİŞİ (SABİT)", f"{sinyal_tetik_fiyati:.4f}") # 
-                        f2.metric("⚡ ANLIK FİYAT (CANLI)", f"{son_fiyat:.4f}", delta=f"{son_fiyat - sinyal_tetik_fiyati:.4f}") # 
+                    # ÇİFT FİYAT DESTEKLİ METRIC SENSÖRLERİ
+                    f1, f2, f3, f4, f5 = st.columns(5) # [cite: 66]
+                    if strateji_yonu != "NÖTR (İZLE)": # [cite: 66]
+                        f1.metric("🎯 SİNYAL GİRİŞİ (SABİT)", f"{sinyal_tetik_fiyati:.4f}") # [cite: 67]
+                        f2.metric("⚡ ANLIK FİYAT (CANLI)", f"{son_fiyat:.4f}", delta=f"{son_fiyat - sinyal_tetik_fiyati:.4f}") # [cite: 67]
                     else:
-                        f1.metric("ANLIK FİYAT", f"{son_fiyat:.4f}") # 
-                        f2.metric("GİRİŞ DURUMU", "BEKLEMEDE") # 
+                        f1.metric("ANLIK FİYAT", f"{son_fiyat:.4f}") # [cite: 67]
+                        f2.metric("GİRİŞ DURUMU", "BEKLEMEDE") # [cite: 68]
                         
-                    f3.metric("OYNK_ALANI (ATR)", f"{atr_val:.4f}") # 
-                    f4.metric("🎯 OTONOM TP", f"{tp_noktasi:.4f}") # 
-                    f5.metric("🛑 OTONOM SL", f"{sl_noktasi:.4f}") # 
+                    f3.metric("OYNK_ALANI (ATR)", f"{atr_val:.4f}") # [cite: 68]
+                    f4.metric("🎯 OTONOM TP", f"{tp_noktasi:.4f}") # [cite: 68]
+                    f5.metric("🛑 OTONOM SL", f"{sl_noktasi:.4f}") # [cite: 69]
 
                     # PANEL YERLEŞİMİ (Sol: İstatistikler | Sağ: Gelişmiş Plotly)
-                    sol_p, sag_p = st.columns([1, 2]) # 
+                    sol_p, sag_p = st.columns([1, 2]) # [cite: 69, 70]
                     
                     with sol_p:
-                        st.markdown("### 🧠 Çift Yönlü Sistem Ortalaması") # 
-                        st.markdown(f"**🟢 Long Algoritma Ağırlığı:** `{long_skor} / 10`") # 
-                        st.markdown(f"""<div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 12px;"><div style="width: {int(long_skor*10)}%; background-color: #2ECC71; height: 100%; border-radius: 4px;"></div></div>""", unsafe_allow_html=True) # 
-                        st.markdown(f"**🔴 Short Algoritma Ağırlığı:** `{short_skor} / 10`") # 
-                        st.markdown(f"""<div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 20px;"><div style="width: {int(short_skor*10)}%; background-color: #E74C3C; height: 100%; border-radius: 4px;"></div></div>""", unsafe_allow_html=True) # 
+                        st.markdown("### 🧠 Çift Yönlü Sistem Ortalaması") # [cite: 70]
+                        st.markdown(f"**🟢 Long Algoritma Ağırlığı:** `{long_skor} / 10`") # [cite: 71]
+                        st.markdown(f"""<div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 12px;"><div style="width: {int(long_skor*10)}%; background-color: #2ECC71; height: 100%; border-radius: 4px;"></div></div>""", unsafe_allow_html=True) # [cite: 71]
+                        st.markdown(f"**🔴 Short Algoritma Ağırlığı:** `{short_skor} / 10`") # [cite: 71]
+                        st.markdown(f"""<div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 20px;"><div style="width: {int(short_skor*10)}%; background-color: #E74C3C; height: 100%; border-radius: 4px;"></div></div>""", unsafe_allow_html=True) # [cite: 72]
                         
-                        st.markdown("#### 🔍 Sinyal Gerekçeleri") # 
-                        for neden in nedenler: st.write(f"- {neden}") # 
+                        st.markdown("#### 🔍 Sinyal Gerekçeleri") # [cite: 72]
+                        for neden in nedenler: st.write(f"- {neden}") # [cite: 73]
                             
-                        st.markdown("#### 🔬 Teknik Değerler") # 
-                        st.write(f"**RSI Göstergesi:** {rsi_val:.2f}") # 
+                        st.markdown("#### 🔬 Teknik Değerler") # [cite: 73]
+                        st.write(f"**RSI Göstergesi:** {rsi_val:.2f}") # [cite: 74]
                         
-                        st.markdown("#### 🏰 Asıl Kaleler (Sabit)") # 
-                        st.error(f"**🏰 Ana Direniş Hattı:** `{asıl_direnc_kale:.4f}`") # 
-                        st.info(f"**🏰 Ana Güvenlik Üssü (Destek):** `{asıl_destek_kale:.4f}`") # 
+                        st.markdown("#### 🏰 Asıl Kaleler (Sabit)") # [cite: 74]
+                        st.error(f"**🏰 Ana Direniş Hattı:** `{asıl_direnc_kale:.4f}`") # [cite: 74]
+                        st.info(f"**🏰 Ana Güvenlik Üssü (Destek):** `{asıl_destek_kale:.4f}`") # [cite: 75]
 
                     with sag_p:
-                        st.markdown("### 📈 Çift Yönlü Grafik ve Hedef Haritası") # 
-                        fig_fx = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.7, 0.3]) # 
-                        fig_fx.add_trace(go.Candlestick(x=df_fx.index, open=df_fx['Open'], high=df_fx['High'], low=df_fx['Low'], close=df_fx['Close'], name="Fiyat"), row=1, col=1) # 
+                        st.markdown("### 📈 Çift Yönlü Grafik ve Hedef Haritası") # [cite: 75]
+                        fig_fx = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.7, 0.3]) # [cite: 75]
+                        fig_fx.add_trace(go.Candlestick(x=df_fx.index, open=df_fx['Open'], high=df_fx['High'], low=df_fx['Low'], close=df_fx['Close'], name="Fiyat"), row=1, col=1) # [cite: 76]
                         
                         # 🏰 KALIN VE DÜZ ÇİZGİLER (Asıl Sabit Kaleler)
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=[asıl_direnc_kale]*len(df_fx), line=dict(color='#8B0000', width=3.5, dash='solid'), name="🏰 ASIL DİRENÇ KALESİ"), row=1, col=1) # 
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=[asıl_destek_kale]*len(df_fx), line=dict(color='#006400', width=3.5, dash='solid'), name="🏰 ASIL DESTEK KALESİ"), row=1, col=1) # 
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=[asıl_direnc_kale]*len(df_fx), line=dict(color='#8B0000', width=3.5, dash='solid'), name="🏰 ASIL DİRENÇ KALESİ"), row=1, col=1) # [cite: 77]
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=[asıl_destek_kale]*len(df_fx), line=dict(color='#006400', width=3.5, dash='solid'), name="🏰 ASIL DESTEK KALESİ"), row=1, col=1) # [cite: 77]
                         
                         # 🏃 İNCE VE KESİKLİ ÇİZGİLER (Yürüyen Momentum Seviyeleri)
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['Direnç_S1'], line=dict(color='#C0392B', width=1.5, dash='dot'), name="🏃 Yürüyen Direnç"), row=1, col=1) # 
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['Destek_D1'], line=dict(color='#27AE60', width=1.5, dash='dot'), name="🏃 Yürüyen Destek"), row=1, col=1) # 
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['Direnç_S1'], line=dict(color='#C0392B', width=1.5, dash='dot'), name="🏃 Yürüyen Direnç"), row=1, col=1) # [cite: 78]
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['Destek_D1'], line=dict(color='#27AE60', width=1.5, dash='dot'), name="🏃 Yürüyen Destek"), row=1, col=1) # [cite: 78]
                         
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_ust'], line=dict(color='#8E44AD', width=1.2, dash='dash'), name="Box Üst"), row=1, col=1) # 
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_alt'], line=dict(color='#8E44AD', width=1.2, dash='dash'), name="Box Alt"), row=1, col=1) # 
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA21'], line=dict(color='#E67E22', width=1.0), name="EMA 21"), row=1, col=1) # 
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA50'], line=dict(color='#3498DB', width=1.0), name="EMA 50"), row=1, col=1) # 
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_ust'], line=dict(color='#8E44AD', width=1.2, dash='dash'), name="Box Üst"), row=1, col=1) # [cite: 79]
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['box_alt'], line=dict(color='#8E44AD', width=1.2, dash='dash'), name="Box Alt"), row=1, col=1) # [cite: 79]
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA21'], line=dict(color='#E67E22', width=1.0), name="EMA 21"), row=1, col=1) # [cite: 79]
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['EMA50'], line=dict(color='#3498DB', width=1.0), name="EMA 50"), row=1, col=1) # [cite: 80]
                         
-                        if strateji_yonu != "NÖTR (İZLE)": # 
-                            fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[tp_noktasi, tp_noktasi], line=dict(color='#2ECC71', width=2.5), name="Hedef (TP)"), row=1, col=1) # 
-                            fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sl_noktasi, sl_noktasi], line=dict(color='#E74C3C', width=2.5), name="Risk Sınırı (SL)"), row=1, col=1) # 
-                            fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sinyal_tetik_fiyati, sinyal_tetik_fiyati], line=dict(color='#111111', width=2, dash='dot'), name="Sabit Giriş Seviyesi"), row=1, col=1) # 
+                        if strateji_yonu != "NÖTR (İZLE)": # [cite: 80]
+                            fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[tp_noktasi, tp_noktasi], line=dict(color='#2ECC71', width=2.5), name="Hedef (TP)"), row=1, col=1) # [cite: 81]
+                            fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sl_noktasi, sl_noktasi], line=dict(color='#E74C3C', width=2.5), name="Risk Sınırı (SL)"), row=1, col=1) # [cite: 81]
+                            fig_fx.add_trace(go.Scatter(x=[df_fx.index[-20], df_fx.index[-1]], y=[sinyal_tetik_fiyati, sinyal_tetik_fiyati], line=dict(color='#111111', width=2, dash='dot'), name="Sabit Giriş Seviyesi"), row=1, col=1) # [cite: 81]
             
-                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['RSI'], line=dict(color='#16A085', width=1.5), name="RSI"), row=2, col=1) # 
-                        fig_fx.update_layout(xaxis_rangeslider_visible=False, height=650, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10)) # 
-                        st.plotly_chart(fig_fx, use_container_width=True) # 
+                        fig_fx.add_trace(go.Scatter(x=df_fx.index, y=df_fx['RSI'], line=dict(color='#16A085', width=1.5), name="RSI"), row=2, col=1) # [cite: 82]
+                        fig_fx.update_layout(xaxis_rangeslider_visible=False, height=650, template="plotly_white", margin=dict(l=10, r=10, t=10, b=10)) # [cite: 82]
+                        st.plotly_chart(fig_fx, use_container_width=True) # [cite: 82]
 
-        if sonuclar: # 
-            st.markdown("### 📋 Küresel Piyasalar Anlık Tarama Özeti") # 
-            df_sonuc = pd.DataFrame(sonuclar).sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True) # 
-            st.dataframe(df_sonuc, use_container_width=True) #
-# =================================================================================
-# =================================================================================
-# =================================================================================
+        if sonuclar: # [cite: 83]
+            st.markdown("### 📋 Küresel Piyasalar Anlık Tarama Özeti") # [cite: 83]
+            df_sonuc = pd.DataFrame(sonuclar).sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True) # [cite: 83]
+            st.dataframe(df_sonuc, use_container_width=True) # [cite: 83]
 # =================================================================================
 # =================================================================================
 # ÇEKİRDEK 4: ULTRA FXMATİK (QUANT MATRIX) - DİNAMİK RENKLİ VE SERBEST GRAFİKLİ MOTOR
