@@ -8,12 +8,12 @@ import numpy as np
 import time
 import os
 import requests
-
 # =================================================================================
 def get_realtime_data_direct(ticker_sembol, interval_kod):
     """
     Yahoo kısıtlamalarını tamamen atlayarak, Foreks ve Altın çiftleri için
-    Investing/TradingView altyapısından 0 gecikmeli, anlık saniyelik veri akışı sağlar.
+    TradingView altyapısından 0 gecikmeli, anlık veri akışı sağlar.
+    İndikatörlerin kırılmaması için zaman indeksini Pandas Datetime formatına senkronize eder.
     """
     import requests
     import pandas as pd
@@ -42,21 +42,18 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
 
     tv_symbol = forex_mapping.get(ticker_sembol, ticker_sembol)
     
-    # 🛰️ GERÇEK ZAMANLI FOREKS ENJEKTÖRÜ (FREE REALTIME AGGREGATOR)
-    # 1 saatlik bar düzeninde veriyi doğrudan TradingView/FX_IDC veri havuzundan simüle ediyoruz
-    url = "https://tvc4.tradingview.com/7bdf1cf208e1694f2ee1a5009a7b9370/1717882400/history"
-    
-    # Zaman aralığını 1h veya 15m düzenine göre hesapla
+    # Zaman aralığını hesapla (Son 30 günlük veri)
     bitis_ts = int(datetime.now().timestamp())
-    baslangic_ts = bitis_ts - (30 * 24 * 60 * 60) # 30 günlük geçmiş mum verisi
+    baslangic_ts = bitis_ts - (30 * 24 * 60 * 60)
     
-    # TradingView interval kodları: 1 saat = 60, 15 dakika = 15, 1 gün = D
+    # Çözünürlük ayarı (1h = 60, 15m = 15)
     tv_resolution = "60" if interval_kod == "1h" else ("15" if interval_kod == "15m" else "D")
     
-    # FX_IDC ve ICE borsalarından spot anlık temiz veri havuzu seçimi
+    # Uygun veri havuzu seçimi
     symbol_string = f"FX_IDC:{tv_symbol}" if "USD" in tv_symbol or tv_symbol in ["DXY", "EURUSD", "GBPUSD", "USDJPY"] else f"CAPITALCOM:{tv_symbol}"
     if tv_symbol in ["SPX500", "NAS100", "GER40"]: symbol_string = f"CAPITALCOM:{tv_symbol}"
 
+    url = "https://tvc4.tradingview.com/7bdf1cf208e1694f2ee1a5009a7b9370/1717882400/history"
     params = {
         "symbol": symbol_string,
         "resolution": tv_resolution,
@@ -71,14 +68,20 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
         if req.status_code == 200:
             json_data = req.json()
             if json_data.get('s') == 'ok':
-                # TradingView anlık barlarını pandas dataframe yapısına oturtuyoruz
+                # 🌟 KRİTİK DÜZELTME: Zaman damgalarını tam sayı listesinden Pandas Datetime formatına alıyoruz
+                zaman_indeksi = pd.to_datetime(json_data['t'], unit='s')
+                
                 df_rt = pd.DataFrame({
                     'Open': json_data['o'],
                     'High': json_data['h'],
                     'Low': json_data['l'],
                     'Close': json_data['c'],
                     'Volume': json_data.get('v', [0] * len(json_data['t']))
-                }, index=pd.to_datetime(json_data['t'], unit='s'))
+                }, index=zaman_indeksi)
+                
+                # Sütun tiplerini sayısal (float) yapıyoruz ki indikatörler hata vermesin
+                for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+                    df_rt[col] = pd.to_numeric(df_rt[col], errors='coerce')
                 
                 # Türkiye saatine senkronizasyon (+3 saat ekleme)
                 df_rt.index = df_rt.index + timedelta(hours=3)
@@ -87,7 +90,45 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
     except:
         pass
         
-    # Eğer TV sunucusunda anlık hata olursa sistemin çökmemesi için Yahoo'yu yedek hat olarak kullansın
+    return pd.DataFrame()
+# =================================================================================
+# 🚀 HIZLI CANLI VERİ MOTORU (YAHOO REALTIME ENDPOINT - KÜRESEL SÜRÜM)
+# =================================================================================
+def get_realtime_data_direct(ticker_sembol, interval_kod):
+    """
+    Kütüphane gecikmelerini tamamen atlayarak doğrudan Yahoo Canlı Veri sunucularına
+    bağlanır ve anlığa en yakın dataframe çıktısını üretir.
+    """
+    import requests
+    import pandas as pd
+    
+    range_map = {"15m": "5d", "1h": "30d", "1d": "2y"}
+    sure_kilit = range_map.get(interval_kod, "2y")
+    
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker_sembol}"
+    params = {"range": sure_kilit, "interval": interval_kod, "includePrePost": "false"}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    
+    try:
+        req = requests.get(url, params=params, headers=headers, timeout=10)
+        if req.status_code == 200:
+            json_data = req.json()
+            result = json_data['chart']['result'][0]
+            timestamps = result['timestamp']
+            indicators = result['indicators']['quote'][0]
+            
+            df_rt = pd.DataFrame({
+                'Open': indicators['open'],
+                'High': indicators['high'],
+                'Low': indicators['low'],
+                'Close': indicators['close'],
+                'Volume': indicators['volume']
+            }, index=pd.to_datetime(timestamps, unit='s'))
+            
+            df_rt.dropna(subset=['Close'], inplace=True)
+            return df_rt
+    except:
+        pass
     return pd.DataFrame()
 
 # ==========================================
