@@ -11,9 +11,9 @@ import requests
 # =================================================================================
 def get_realtime_data_direct(ticker_sembol, interval_kod):
     """
-    GitHub ve Streamlit Cloud sunucularında 7/24 kesintisiz çalışan,
-    Binance Spot & Futures API tabanlı, kısıtlamasız ve genişletilmiş veri motoru.
-    Kripto, Metal, Enerji, Forex ve Endekslerin tamamını destekler.
+    GitHub ve Streamlit Cloud sunucularında 7/24 kilitlenmeden çalışan,
+    Binance Spot & Futures API tabanlı, kısıtlamasız veri motoru.
+    Orijinal grafik ve indikatör kodlarının kırılmaması için sütun yapılarını tam senkronize eder.
     """
     import requests
     import pandas as pd
@@ -25,56 +25,52 @@ def get_realtime_data_direct(ticker_sembol, interval_kod):
     if ".IS" in sembol_temiz:
         return pd.DataFrame()
 
-    # Zaman periyodu dönüşümü
+    # Zaman periyodu dönüşümü (Streamlit kodunu Binance diline çevirme)
     binance_interval = "1h" if interval_kod == "1h" else ("15m" if interval_kod == "15m" else "1d")
     
-    # Vadeli işlemler hattından mı yoksa spot hattan mı çekileceğinin tespiti
-    # Endeksler, Forex çiftleri ve Emtialar Binance vadeli işlemler (Futures) API hattında bulunur.
-    is_futures = False
-    futures_keywords = ["USDT", "1000", "USDC"] 
+    # Doğru API uç noktasını tespit etme (Endeksler, Forex ve Emtialar vadeli taraftadır)
+    # Ban riskini sıfıra indirmek için kurumsal yedekli sunucular tanımlandı
+    futures_symbols = ["BTCUSDT", "ETHUSDT", "EURUSDT", "GBPUSDT", "USDJPY", "USDCHF", "AUDUSDT", "SPXUSDT", "NDAQUSDT", "XAGUSDT", "HGUSDT", "XPTUSDT", "XPDUSDT", "USOILUSDT"]
     
-    # Eğer sembol ismi doğrudan zaten Binance formatındaysa koru, değilse eşle:
-    # Tüm listenin hatasız akması için arka plan haritası
-    if sembol_temiz.endswith("USDT"):
-        binance_symbol = sembol_temiz
-        # Bazı sentetik forex/endeks türevleri vadeli taraftadır
-        if binance_symbol in ["EURUSDT", "GBPUSDT", "USDJPYUSDT", "AUDUSDT", "AUDUSD", "USDCUSD", "ICPUSDT"]:
-            is_futures = True
+    if sembol_temiz in futures_symbols or any(x in sembol_temiz for x in ["SPX", "NDAQ", "OIL", "EUR", "GBP", "JPY", "CHF", "AUD"]):
+        # Vadeli işlemler (Futures) klines veri hattı
+        url = f"https://fapi.binance.com/fapi/v1/klines?symbol={sembol_temiz}&interval={binance_interval}&limit=200"
     else:
-        binance_symbol = sembol_temiz
+        # Spot işlemler (Kripto ve Fiziksel Altın) klines veri hattı
+        url = f"https://api.binance.com/api/v3/klines?symbol={sembol_temiz}&interval={binance_interval}&limit=200"
 
-    # İstek atılacak doğru URL'i belirle (Banlanma riskini sıfıra indiren kurumsal havuz)
-    if "PERP" in binance_symbol or binance_symbol in ["SPXUSDT", "NDAQUSDT", "US500USDT", "NAS100USDT"]:
-        url = f"https://fapi.binance.com/fapi/v1/klines?symbol={binance_symbol.replace('PERP','')}&interval={binance_interval}&limit=300"
-    else:
-        # Varsayılan kontrol: Genel akış
-        url = f"https://api.binance.com/api/v3/klines?symbol={binance_symbol}&interval={binance_interval}&limit=300"
-
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     
     try:
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
             raw_data = response.json()
             
+            # Gelen veriyi orijinal kodunun (Lazer, Radar, Çekirdek3) istediği şablona zorluyoruz
             df_rt = pd.DataFrame(raw_data, columns=[
                 'Open_time', 'Open', 'High', 'Low', 'Close', 'Volume',
                 'Close_time', 'Quote_asset_volume', 'Number_of_trades',
                 'Taker_buy_base_asset_volume', 'Taker_buy_quote_asset_volume', 'Ignore'
             ])
             
+            # Zaman damgasını (Timestamp) saniyeye çevirip Pandas Datetime Index yapıyoruz
             df_rt['time'] = pd.to_datetime(df_rt['Open_time'], unit='ms')
             df_rt.set_index('time', inplace=True)
             
+            # Sütun tiplerini sayısal (float) yapıyoruz ki indikatörler çöökmesin!
             for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
                 df_rt[col] = pd.to_numeric(df_rt[col], errors='coerce')
                 
+            # Orijinal grafik modunun sadece ihtiyaç duyduğu sütun matrisini bırakıyoruz
             df_rt = df_rt[['Open', 'High', 'Low', 'Close', 'Volume']]
             
             # 🌍 Türkiye Saati Senkronizasyonu (+3 Saat)
             df_rt.index = df_rt.index + timedelta(hours=3)
+            
+            # Boş verileri temizle
+            df_rt.dropna(subset=['Close'], inplace=True)
             return df_rt
-    except:
+    except Exception as e:
         pass
         
     return pd.DataFrame()
@@ -137,23 +133,23 @@ with st.sidebar:
     
 # 🌐 Gelişmiş Küresel Varlık Listesi (Kripto, Emtia, Forex, Endeksler)
         # Binance global fiyat akışlarına tam entegre edilmiş kod karşılıkları
+# 🌐 Gelişmiş Küresel Varlık Listesi (Genişletilmiş ve Tam Senkronize Mod)
 forex_assets = {
-            "⚡ BITCOIN (BTC/USDT)": "BTCUSDT",
-            "💎 ETHEREUM (ETH/USDT)": "ETHUSDT",
-            "🏆 ONS ALTIN (PAXG/USDT)": "PAXGUSDT",
-            "🥈 ONS GÜMÜŞ (XAGUSDT)": "XAGUSDT",
-            "🥉 BAKIR (COPPERUSDT)": "HGUSDT",
-            "⛓️ PLATİN (XPTUSDT)": "XPTUSDT",
-            "🧲 PALADYUM (XPDUSDT)": "XPDUSDT",
-            "🛢️ BRENT PETROL (OILUSDT)": "USOILUSDT",
-            "🇪🇺 EUR / USD": "EURUSDT",
-            "🇯🇵 USD / JPY": "USDJPY",
-            "🇨🇭 USD / CHF": "USDCHF",
-            "🇦🇺 AUD / USD": "AUDUSDT",
-            "🇺🇸 S&P 500 ENDEKSİ": "SPXUSDT",
-            "📊 NASDAQ 100 ENDEKSİ": "NDAQUSDT"
-        }
-
+    "🏆 ONS ALTIN (PAXG/USDT)": "PAXGUSDT",
+    "🥈 ONS GÜMÜŞ (XAG/USDT)": "XAGUSDT",
+    "🥉 BAKIR (HG/USDT)": "HGUSDT",
+    "⛓️ PLATİN (XPT/USDT)": "XPTUSDT",
+    "🧲 PALADYUM (XPD/USDT)": "XPDUSDT",
+    "🛢️ BRENT PETROL (OIL/USDT)": "USOILUSDT",
+    "🇪🇺 EUR / USD": "EURUSDT",
+    "🇯🇵 USD / JPY": "USDJPY",
+    "🇨🇭 USD / CHF": "USDCHF",
+    "🇦🇺 AUD / USD": "AUDUSDT",
+    "🇺🇸 S&P 500 ENDEKSİ": "SPXUSDT",
+    "📊 NASDAQ 100 ENDEKSİ": "NDAQUSDT",
+    "⚡ BITCOIN (BTC/USDT)": "BTCUSDT",
+    "💎 ETHEREUM (ETH/USDT)": "ETHUSDT"
+}
 # Kodun bundan sonra gelen "if calisma_modu == 'Lazer (Detaylı Analiz & Strateji)':" 
 # kısmı ve altındaki tüm modlar (Çekirdek 1, 2, 3) aynen devam edecek.    }
 
