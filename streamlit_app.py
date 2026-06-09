@@ -839,11 +839,6 @@ elif calisma_modu == "Radar (BIST 100 Full Hibrit Tarama)":
 # =================================================================================
 # =================================================================================
 # =================================================================================
-# =================================================================================
-# =================================================================================
-# =================================================================================
-# ÇEKİRDEK 3: FOREX & KÜRESEL PİYASALAR (TAM OTONOM KESİN CANLI VERİ ENTEGRELİ RADAR)
-# =================================================================================
 elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
     st_autorefresh(interval=15000, key="global_forex_multi_scan_v15_final_sabit_kaleler") # Canlı yenileme 
     st.markdown("## 🌐 ÇİFT YÖNLÜ OTONOM FOREX KOMUTA MERKEZİ (TRADINGVIEW CANLI HATTI)") # 
@@ -862,7 +857,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage" # 
                 payload = {"chat_id": TELEGRAM_CHAT_ID, "text": mesaj, "parse_mode": "Markdown"} # 
                 requests.post(url, json=payload, timeout=5) # 
-            except Exception as e: # 
+            except:
                 pass # 
 
     # SEKMELİ YAPI (Grafik Paneli ve Geniş Haber Paneli Ayrımı)
@@ -925,12 +920,12 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             if state_sinyal_key not in st.session_state: st.session_state[state_sinyal_key] = "NÖTR (İZLE)" # 
             if state_fiyat_key not in st.session_state: st.session_state[state_fiyat_key] = 0.0 # 
             
-            # 🛰️ YENİ GECİKMESİZ TRADINGVIEW VERİ MOTORU ÇAĞRISI
+            # 🛰️ TRADINGVIEW CANLI MOTORUNDAN VERİ ÇEKİLİYOR
             df_fx = get_realtime_data_direct(asset_ticker, "1h") 
                 
             if not df_fx.empty and len(df_fx) > 25: # 
                 
-                # 🛡️ GÜVENLİK ZIRHI: Sütun tiplerinin tam sayısal (float) olduğunu garanti ediyoruz
+                # 🛡️ GÜVENLİK ZIRHI: Sütun tiplerinin float olmasını garanti et (Eski Yahoo çoklu indeks zırhı kalktı)
                 for col in ['Open', 'High', 'Low', 'Close']:
                     df_fx[col] = pd.to_numeric(df_fx[col], errors='coerce')
                 
@@ -965,8 +960,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 fx_loss = -fx_delta.clip(upper=0) # 
                 fx_avg_gain = fx_gain.ewm(com=13, adjust=False).mean() # 
                 fx_avg_loss = fx_loss.ewm(com=13, adjust=False).mean() # 
-                fx_rs = fx_avg_gain / fx_avg_loss # 
-                df_fx['RSI'] = 100 - (100 / (1 + fx_rs)) # 
+                df_fx['RSI'] = 100 - (100 / (1 + (fx_avg_gain / fx_avg_loss))) # 
                 
                 df_fx['EMA21'] = df_fx['Close'].ewm(span=21, adjust=False).mean() # 
                 df_fx['EMA50'] = df_fx['Close'].ewm(span=50, adjust=False).mean() # 
@@ -1047,7 +1041,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                 if is_msb_bullish: long_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Boğa yönlü kırıldı (MSB/CHoCH)") # 
                     
                 if is_bearish_pin: short_skor += 1.0; nedenler.append("❄️ PRICE ACTION: Ayı Pin Bar oluştu") # 
-                if is_bearish_engulfing: short_skor += 1.0; nedenler.append("❄️ PRICE ACTION: Bearish Engulfing görüldü") # 
+                if is_bearish_engulfing: short_skor += 1.0; nedenler.append("🔥 PRICE ACTION: Bearish Engulfing görüldü") # 
                 if is_msb_bearish: short_skor += 1.0; nedenler.append("⚔️ PRICE ACTION: Market Yapısı Ayı yönlü kırıldı (MSB/CHoCH)") # 
 
                 long_skor = min(10.0, round(long_skor, 1)) # 
@@ -1092,7 +1086,7 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                     st.session_state[state_sinyal_key] = "NÖTR (İZLE)" # 
                     st.session_state[state_fiyat_key] = 0.0 # 
 
-                # 🖥️ EKRANDA DETAYLI GÖRSEL GÖSTERİM (SEÇİLİ ENSTRÜMAN)
+                # 🖥Header/Kart Gösterimi (Seçili Enstrüman)
                 if asset_adi == secilen_forex_adi: # 
                     strateji_yonu = st.session_state[state_sinyal_key] # 
                     
@@ -1109,7 +1103,6 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                         durum_msg = "🟡 TEST BÖLGESİ - BELİRLİ BİR SEVİYE KIRILIMI BEKLENİYOR" # 
                         sl_noktasi = son_fiyat - (atr_val * 2.0); tp_noktasi = son_fiyat + (atr_val * 2.0) #
 
-                    # Savaş Kartı Gösterimi
                     st.markdown(f"""
                         <div style="background-color: {durum_color}; padding: 25px; border-radius: 15px; text-align: center; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.15);">
                             <h1 style="color: #FFFFFF !important; border: none; margin: 0; font-size: 2.2rem;">{asset_adi} // DETAYLI CANLI MONITOR</h1>
@@ -1130,12 +1123,12 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
                     f4.metric("🎯 OTONOM TP", f"{tp_noktasi:.4f}") # 
                     f5.metric("🛑 OTONOM SL", f"{sl_noktasi:.4f}") # 
 
-                    # PANEL YERLEŞİMİ (Sol: İstatistikler | Sağ: Gelişmiş Plotly)
+                    # PANEL YERLEŞİMİ (Sol Veriler | Sağ Grafik)
                     sol_p, sag_p = st.columns([1, 2]) # 
                     
                     with sol_p:
                         st.markdown("### 🧠 Çift Yönlü Sistem Ortalaması") # 
-                        st.markdown(f"**🟢 Long Algoritma Ağırligı:** `{long_skor} / 10`") # 
+                        st.markdown(f"**🟢 Long Algoritma Ağırlığı:** `{long_skor} / 10`") # 
                         st.markdown(f"""<div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 12px;"><div style="width: {int(long_skor*10)}%; background-color: #2ECC71; height: 100%; border-radius: 4px;"></div></div>""", unsafe_allow_html=True) # 
                         st.markdown(f"**🔴 Short Algoritma Ağırlığı:** `{short_skor} / 10`") # 
                         st.markdown(f"""<div style="width: 100%; background-color: #E0E0E0; height: 8px; border-radius: 4px; margin-bottom: 20px;"><div style="width: {int(short_skor*10)}%; background-color: #E74C3C; height: 100%; border-radius: 4px;"></div></div>""", unsafe_allow_html=True) # 
@@ -1181,6 +1174,9 @@ elif calisma_modu == "Forex & Küresel Piyasalar (Çift Yönlü)":
             st.markdown("### 📋 Küresel Piyasalar Anlık Tarama Özeti") # 
             df_sonuc = pd.DataFrame(sonuclar).sort_values(by="Hibrit Skor", ascending=False).reset_index(drop=True) # 
             st.dataframe(df_sonuc, use_container_width=True) #
+# =================================================================================
+# =================================================================================
+# =================================================================================
 # =================================================================================
 # =================================================================================
 # ÇEKİRDEK 4: ULTRA FXMATİK (QUANT MATRIX) - DİNAMİK RENKLİ VE SERBEST GRAFİKLİ MOTOR
