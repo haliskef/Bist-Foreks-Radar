@@ -11,71 +11,66 @@ import requests
 # =================================================================================
 def get_realtime_data_direct(ticker_sembol, interval_kod):
     """
-    Sadece küresel emtialara (Altın, Gümüş, Bakır, Platin, Paladyum, Petrol) odaklanmış,
-    TradingView / CapitalCom altyapısını kullanan kesintisiz, anlık veri motoru.
+    Sadece küresel emtialara odaklanmış, verileri doğrudan BİNANCE VADELİ İŞLEMLER (Futures) 
+    resmi API hattından çeken 7/24 kesintisiz ve bulut uyumlu veri motoru.
     """
     import requests
     import pandas as pd
-    import numpy as np
     from datetime import datetime, timedelta
 
-    # 🌐 EMTİA TICKER HARİTASI
-    forex_mapping = {
-        "GC=F": "XAUUSD",       # ONS ALTIN
-        "SI=F": "XAGUSD",       # ONS GÜMÜŞ
-        "HG=F": "COPPER",       # ONS BAKIR
-        "PA=F": "XPDUSD",       # ONS PALADYUM
-        "PL=F": "XPTUSD",       # ONS PLATİN
-        "BZ=F": "UKOIL",        # BRENT PETROL
-        "CL=F": "USOIL"         # WTI HAM PETROL
-    }
+    sembol_temiz = str(ticker_sembol).strip()
+    
+    # BIST Emniyet Kalkanı
+    if ".IS" in sembol_temiz:
+        return pd.DataFrame()
 
-    tv_symbol = forex_mapping.get(ticker_sembol, ticker_sembol)
+    # Zaman çözünürlüğünü Binance diline çeviriyoruz (1h -> 1h, 15m -> 15m)
+    binance_interval = "1h" if interval_kod == "1h" else ("15m" if interval_kod == "15m" else "1d")
     
-    # Son 30 günlük derinlik (İndikatörler ve Kristal Box için fazlasıyla yeterli)
-    bitis_ts = int(datetime.now().timestamp())
-    baslangic_ts = bitis_ts - (30 * 24 * 60 * 60)
-    
-    # Çözünürlük: 1h = 60 (Saatlik), 15m = 15 (15 Dakikalık)
-    tv_resolution = "60" if interval_kod == "1h" else ("15" if interval_kod == "15m" else "D")
-    
-    # Emtialar için en güvenli ve güncel havuz CAPITALCOM hattıdır
-    symbol_string = f"CAPITALCOM:{tv_symbol}"
-    if tv_symbol in ["XAUUSD", "XAGUSD"]:
-        symbol_string = f"FX_IDC:{tv_symbol}" # Altın ve Gümüş için ana forex hat sunucusu
-
-    url = "https://tvc4.tradingview.com/7bdf1cf208e1694f2ee1a5009a7b9370/1717882400/history"
-    params = {
-        "symbol": symbol_string,
-        "resolution": tv_resolution,
-        "from": baslangic_ts,
-        "to": bitis_ts
+    # 🔄 BİNANCE EMRAH/EMTİA SEMBOL HARİTASI
+    # Senin eski kodlarının kırılmaması için arka planda tam eşleme yapar
+    binance_mapping = {
+        "GC=F": "XAUUSD",       # ONS ALTIN (Binance Vadeli)
+        "SI=F": "XAGUSD",       # ONS GÜMÜŞ (Binance Vadeli)
+        "HG=F": "HGUSDT",       # ONS BAKIR (Binance Vadeli)
+        "BZ=F": "USOILUSDT",    # BRENT PETROL (Binance Vadeli)
+        "XAUUSD": "XAUUSD",
+        "XAGUSD": "XAGUSD"
     }
     
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    binance_symbol = binance_mapping.get(sembol_temiz, sembol_temiz)
+    
+    # Binance Resmi Vadeli İşlemler (Futures) Klines Canlı Veri API Noktası
+    url = f"https://fapi.binance.com/fapi/v1/klines?symbol={binance_symbol}&interval={binance_interval}&limit=300"
+    headers = {'User-Agent': 'Mozilla/5.0'}
     
     try:
-        req = requests.get(url, params=params, headers=headers, timeout=10)
-        if req.status_code == 200:
-            json_data = req.json()
-            if json_data.get('s') == 'ok':
-                zaman_indeksi = pd.to_datetime(json_data['t'], unit='s')
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code == 200:
+            raw_data = response.json()
+            
+            # Gelen ham JSON paketini senin indikatörlerin muhtaç olduğu kalıba döküyoruz
+            df_rt = pd.DataFrame(raw_data, columns=[
+                'Open_time', 'Open', 'High', 'Low', 'Close', 'Volume',
+                'Close_time', 'Quote_asset_volume', 'Number_of_trades',
+                'Taker_buy_base_val', 'Taker_buy_quote_val', 'Ignore'
+            ])
+            
+            # Zaman damgasını (Timestamp) saniyeye çevirip Pandas Datetime Index yapıyoruz
+            df_rt['time'] = pd.to_datetime(df_rt['Open_time'], unit='ms')
+            df_rt.set_index('time', inplace=True)
+            
+            # Sütun tiplerini sayısal (float) yapıyoruz ki formüllerin (RSI, EMA, Box) çökmesin!
+            for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
+                df_rt[col] = pd.to_numeric(df_rt[col], errors='coerce')
                 
-                df_rt = pd.DataFrame({
-                    'Open': json_data['o'],
-                    'High': json_data['h'],
-                    'Low': json_data['l'],
-                    'Close': json_data['c'],
-                    'Volume': json_data.get('v', [0] * len(json_data['t']))
-                }, index=zaman_indeksi)
-                
-                for col in ['Open', 'High', 'Low', 'Close', 'Volume']:
-                    df_rt[col] = pd.to_numeric(df_rt[col], errors='coerce')
-                
-                # 🌍 Türkiye Saati Senkronizasyonu (+3 Saat)
-                df_rt.index = df_rt.index + timedelta(hours=3)
-                df_rt.dropna(subset=['Close'], inplace=True)
-                return df_rt
+            # Orijinal grafik modunun sadece ihtiyaç duyduğu sütun matrisini bırakıyoruz
+            df_rt = df_rt[['Open', 'High', 'Low', 'Close', 'Volume']]
+            
+            # 🌍 Türkiye Saati Senkronizasyonu (+3 Saat)
+            df_rt.index = df_rt.index + timedelta(hours=3)
+            df_rt.dropna(subset=['Close'], inplace=True)
+            return df_rt
     except:
         pass
         
@@ -140,15 +135,14 @@ with st.sidebar:
 # 🌐 Gelişmiş Küresel Varlık Listesi (Kripto, Emtia, Forex, Endeksler)
         # Binance global fiyat akışlarına tam entegre edilmiş kod karşılıkları
 # 🌐 Gelişmiş Küresel Varlık Listesi (Genişletilmiş ve Tam Senkronize Mod)
+
 forex_assets = {
     "🏆 ONS ALTIN": "GC=F",
     "🥈 ONS GÜMÜŞ": "SI=F",
     "🥉 ONS BAKIR": "HG=F",
-    "🧲 ONS PALADYUM": "PA=F",
-    "⛓️ ONS PLATİN": "PL=F",
-    "🛢️ BRENT PETROL": "BZ=F",
-    "Automated WTI PETROL": "CL=F"
+    "🛢️ BRENT PETROL": "BZ=F"
 }
+
 # Kodun bundan sonra gelen "if calisma_modu == 'Lazer (Detaylı Analiz & Strateji)':" 
 # kısmı ve altındaki tüm modlar (Çekirdek 1, 2, 3) aynen devam edecek.    }
 
